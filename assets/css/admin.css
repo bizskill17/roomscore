@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap');
+.hrim-wrap{max-width:1300px}.hrim-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:20px 0}.hrim-card{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:18px}.hrim-card span{display:block;color:#646970}.hrim-card strong{font-size:30px}.hrim-grid-2,.hrim-grid-3{display:grid;gap:18px;margin:18px 0}.hrim-grid-2{grid-template-columns:repeat(2,1fr)}.hrim-grid-3{grid-template-columns:repeat(3,1fr)}.hrim-panel{background:#fff;border:1px solid #dcdcde;border-radius:12px;padding:18px;margin:18px 0}.hrim-panel input,.hrim-panel select,.hrim-panel textarea{width:100%;margin:6px 0 12px}.hrim-table{width:100%;border-collapse:collapse}.hrim-table th,.hrim-table td{padding:9px;border-bottom:1px solid #ddd;text-align:left}@media(max-width:900px){.hrim-grid-2,.hrim-grid-3,.hrim-cards{grid-template-columns:1fr}}
+
+/* v3.8.25: black borders throughout plugin admin screens. */
+.hrim-card,
+.hrim-panel,
+.hrim-panel input,
+.hrim-panel select,
+.hrim-panel textarea,
+.hrim-table,
+.hrim-table th,
+.hrim-table td {
+  border-color:#000000!important;
+}
+.hrim-table{border:1px solid #000000!important;border-collapse:collapse!important}
+.hrim-table th,.hrim-table td{border:1px solid #000000!important}
+
+.hrim-admin,.hrim-admin button,.hrim-admin input,.hrim-admin select,.hrim-admin textarea{font-family:'Montserrat',system-ui,-apple-system,'Segoe UI',sans-serif;font-weight:600;}
