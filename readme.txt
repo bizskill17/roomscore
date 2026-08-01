@@ -1,3 +1,8 @@
+= 3.16.28 =
+* Added GitHub automatic update support for RoomScore.
+* Added private repository authentication via ROOMSCORE_GITHUB_TOKEN.
+* Configured updates to use GitHub Release ZIP assets for WordPress update packages.
+
 = 3.14.41 =
 - Removed the record-count text below Schedule Tasks In Progress and Schedule Tasks History.
 

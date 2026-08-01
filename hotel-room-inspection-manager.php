@@ -2,14 +2,16 @@
 /**
  * Plugin Name: Room Score
  * Description: Room Score — Hotel Inspection Management System with inspections, issue tracking, dashboards and reporting.
- * Version: 3.16.27
+ * Version: 3.16.28
  * Author: BizSkill
  * Author URI: https://bizskill.in
  * Text Domain: hrim
  */
 if (!defined('ABSPATH')) exit;
-require_once __DIR__ . '/vendor/autoload.php';
-define('HRIM_VERSION','3.16.27');
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+define('HRIM_VERSION','3.16.28');
 define('HRIM_FILE',__FILE__);
 define('HRIM_DIR',plugin_dir_path(__FILE__));
 define('HRIM_URL',plugin_dir_url(__FILE__));
@@ -33,16 +35,31 @@ add_action('plugins_loaded',function(){
 
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
-$roomscore_update_checker = PucFactory::buildUpdateChecker(
-    'https://github.com/bizskill17/roomscore/',
-    __FILE__,
-    'hotel-room-inspection-manager'
-);
+function hrim_setup_plugin_updates() {
+    if (!file_exists(__DIR__ . '/vendor/autoload.php')) {
+        return;
+    }
 
-$roomscore_update_checker->setBranch('main');
+    if (!class_exists(PucFactory::class)) {
+        return;
+    }
 
-if (defined('ROOMSCORE_GITHUB_TOKEN') && ROOMSCORE_GITHUB_TOKEN !== '') {
-    $roomscore_update_checker->setAuthentication(
-        ROOMSCORE_GITHUB_TOKEN
+    $roomscore_update_checker = PucFactory::buildUpdateChecker(
+        'https://github.com/bizskill17/roomscore/',
+        __FILE__,
+        'hotel-room-inspection-manager'
     );
+
+    $roomscore_update_checker->setBranch('main');
+
+    $vcs_api = $roomscore_update_checker->getVcsApi();
+    if (is_object($vcs_api) && method_exists($vcs_api, 'enableReleaseAssets')) {
+        $vcs_api->enableReleaseAssets();
+    }
+
+    if (defined('ROOMSCORE_GITHUB_TOKEN') && ROOMSCORE_GITHUB_TOKEN !== '') {
+        $roomscore_update_checker->setAuthentication(ROOMSCORE_GITHUB_TOKEN);
+    }
 }
+
+add_action('plugins_loaded', 'hrim_setup_plugin_updates', 20);
