@@ -8,6 +8,7 @@
  * Text Domain: hrim
  */
 if (!defined('ABSPATH')) exit;
+require_once __DIR__ . '/vendor/autoload.php';
 define('HRIM_VERSION','3.16.27');
 define('HRIM_FILE',__FILE__);
 define('HRIM_DIR',plugin_dir_path(__FILE__));
@@ -29,3 +30,19 @@ add_action('plugins_loaded',function(){
     }
     HRIM_Core::instance();
 });
+
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+$roomscore_update_checker = PucFactory::buildUpdateChecker(
+    'https://github.com/bizskill17/roomscore/',
+    __FILE__,
+    'hotel-room-inspection-manager'
+);
+
+$roomscore_update_checker->setBranch('main');
+
+if (defined('ROOMSCORE_GITHUB_TOKEN') && ROOMSCORE_GITHUB_TOKEN !== '') {
+    $roomscore_update_checker->setAuthentication(
+        ROOMSCORE_GITHUB_TOKEN
+    );
+}
