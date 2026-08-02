@@ -1,3 +1,8 @@
+= 3.16.29 =
+* Integrated bundled BizSkill Plugin Client SDK for licence activation and commercial update delivery.
+* Added Room Score -> Licence admin screen with activate, deactivate and recheck actions plus status details.
+* Removed GitHub token-based updater path from Room Score runtime.
+
 = 3.16.28 =
 * Added GitHub automatic update support for RoomScore.
 * Added private repository authentication via ROOMSCORE_GITHUB_TOKEN.
@@ -45,7 +50,7 @@
 
 === Room Score ===
 Contributors: BizSkill
-Stable tag: 3.16.01
+Stable tag: 3.16.29
 Requires at least: 6.0
 Requires PHP: 7.4
 
@@ -157,6 +162,11 @@ Frontend-first hotel room inspection application with a blank theme-independent 
 * Added manual issue photographs and dependent property/floor/room validation.
 
 == Changelog ==
+
+= 3.16.29 =
+* Integrated bundled BizSkill Plugin Client SDK for licence activation and commercial update delivery.
+* Added Room Score -> Licence admin screen with activate, deactivate and recheck actions plus status details.
+* Removed GitHub token-based updater path from Room Score runtime.
 
 = 3.16.05 =
 * Keep the Edit Asset modal open after removing a checkpoint.
