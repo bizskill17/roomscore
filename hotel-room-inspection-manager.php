@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Room Score
  * Description: Room Score — Hotel Inspection Management System with inspections, issue tracking, dashboards and reporting.
- * Version: 3.16.29
+ * Version: 3.16.30
  * Author: BizSkill
  * Author URI: https://bizskill.in
  * Text Domain: hrim
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) exit;
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
-define('HRIM_VERSION','3.16.29');
+define('HRIM_VERSION','3.16.30');
 define('HRIM_FILE',__FILE__);
 define('HRIM_DIR',plugin_dir_path(__FILE__));
 define('HRIM_URL',plugin_dir_url(__FILE__));

@@ -36,6 +36,69 @@ final class BSPC_Client {
         $this->option_key = 'bspc_' . $this->config['product_slug'];
     }
 
+    private function installation_url(): string {
+        return untrailingslashit(home_url('/'));
+    }
+
+    private function legacy_update_cache_key(): string {
+        return 'bspc_update_' . md5($this->config['product_slug'] . '|' . home_url('/'));
+    }
+
+    private function clear_cached_site_identity(): void {
+        delete_transient($this->legacy_update_cache_key());
+        delete_transient($this->update_cache_key());
+    }
+
+    private function ensure_subsite_context(): bool {
+        return !(is_multisite() && is_network_admin());
+    }
+
+    private function mask_secret(string $value, int $prefix = 4, int $suffix = 4): string {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $length = strlen($value);
+        if ($length <= ($prefix + $suffix)) {
+            return str_repeat('*', max(4, $length));
+        }
+
+        return substr($value, 0, $prefix) . '-****-****-' . substr($value, -$suffix);
+    }
+
+    private function migrate_state(array $state): array {
+        $changed = false;
+
+        foreach (['site_url', 'website_url', 'cached_site_url', 'cached_website_url'] as $legacy_field) {
+            if (array_key_exists($legacy_field, $state)) {
+                unset($state[$legacy_field]);
+                $changed = true;
+            }
+        }
+
+        if (empty($state['instance_id'])) {
+            $state['instance_id'] = wp_generate_uuid4();
+            $changed = true;
+        }
+
+        if (!empty($state['license_key']) && !empty($state['activation_id']) && !empty($state['activation_token']) && empty($state['masked_license_key'])) {
+            $state['masked_license_key'] = $this->mask_secret((string) $state['license_key']);
+            $changed = true;
+        }
+
+        if ($changed) {
+            update_option($this->option_key, $state, false);
+        }
+
+        if (get_option($this->option_key . '_identity_migrated', '0') !== '1') {
+            update_option($this->option_key . '_identity_migrated', '1', false);
+            $this->clear_cached_site_identity();
+        }
+
+        return $state;
+    }
+
     private function hooks(): void {
         add_action('admin_menu', [$this, 'admin_menu']);
         add_action('admin_post_bspc_activate_' . $this->config['product_slug'], [$this, 'activate_action']);
@@ -55,12 +118,7 @@ final class BSPC_Client {
             $state = [];
         }
 
-        if (empty($state['instance_id'])) {
-            $state['instance_id'] = wp_generate_uuid4();
-            update_option($this->option_key, $state, false);
-        }
-
-        return $state;
+        return $this->migrate_state($state);
     }
 
     private function save(array $state): void {
@@ -80,7 +138,7 @@ final class BSPC_Client {
             'timeout' => 20,
             'headers' => ['Content-Type' => 'application/json'],
             'body' => wp_json_encode($payload),
-            'user-agent' => 'BizSkill-Plugin-Client/' . $this->sdk_version() . '; ' . home_url('/'),
+            'user-agent' => 'BizSkill-Plugin-Client/' . $this->sdk_version() . '; ' . $this->installation_url(),
         ]);
 
         if (is_wp_error($response)) {
@@ -102,7 +160,7 @@ final class BSPC_Client {
             'activation_id' => $state['activation_id'] ?? '',
             'activation_token' => $state['activation_token'] ?? '',
             'instance_id' => $state['instance_id'] ?? '',
-            'site_url' => home_url('/'),
+            'site_url' => $this->installation_url(),
             'plugin_version' => $this->config['version'],
             'installed_version' => $this->config['version'],
             'wordpress_version' => get_bloginfo('version'),
@@ -111,7 +169,7 @@ final class BSPC_Client {
     }
 
     private function update_cache_key(): string {
-        return 'bspc_update_' . md5($this->config['product_slug'] . '|' . home_url('/'));
+        return 'bspc_update_' . md5($this->config['product_slug'] . '|' . $this->installation_url());
     }
 
     private function admin_page_url(): string {
@@ -167,6 +225,10 @@ final class BSPC_Client {
     }
 
     public function admin_menu(): void {
+        if (!$this->ensure_subsite_context()) {
+            return;
+        }
+
         add_submenu_page(
             $this->config['menu_parent'],
             $this->config['product_name'] . ' Licence',
@@ -182,6 +244,12 @@ final class BSPC_Client {
             return;
         }
 
+        if (!$this->ensure_subsite_context()) {
+            echo '<div class="wrap"><h1>' . esc_html($this->config['product_name']) . ' Licence</h1>';
+            echo '<div class="notice notice-error"><p>Licence actions are only available from the current subsite dashboard.</p></div></div>';
+            return;
+        }
+
         $state = $this->state();
         $active = $this->is_active($state);
 
@@ -189,7 +257,13 @@ final class BSPC_Client {
         $expires_at = (string) ($state['expires_at'] ?? '');
         $last_error = (string) ($state['last_error'] ?? '');
         $updates_allowed = $this->flag_to_bool($state['updates_allowed'] ?? false);
-        $site_url = home_url('/');
+        $site_url = $this->installation_url();
+        $masked_license_key = (string) ($state['masked_license_key'] ?? '');
+        if ($masked_license_key === '' && !empty($state['license_key'])) {
+            $masked_license_key = $this->mask_secret((string) $state['license_key']);
+        }
+        $masked_instance_id = $this->mask_secret((string) ($state['instance_id'] ?? ''), 8, 4);
+        $subsite_id = (string) get_current_blog_id();
 
         echo '<div class="wrap"><h1>' . esc_html($this->config['product_name']) . ' Licence</h1>';
 
@@ -205,25 +279,30 @@ final class BSPC_Client {
         echo '<tr><th>Installed version</th><td>' . esc_html($this->config['version']) . '</td></tr>';
         echo '<tr><th>Licence status</th><td><strong style="color:' . ($active ? '#16803d' : '#b42318') . '">' . esc_html($license_status) . '</strong></td></tr>';
         echo '<tr><th>Expiry date</th><td>' . esc_html($expires_at !== '' ? $expires_at : 'N/A') . '</td></tr>';
-        echo '<tr><th>Updates allowed</th><td>' . ($updates_allowed ? 'Yes' : 'No') . '</td></tr>';
+        echo '<tr><th>Updates allowed</th><td>' . esc_html($updates_allowed ? 'Yes' : 'No') . '</td></tr>';
         echo '<tr><th>Current website URL</th><td><code>' . esc_html($site_url) . '</code></td></tr>';
+        echo '<tr><th>Installation UUID</th><td><code>' . esc_html($masked_instance_id !== '' ? $masked_instance_id : 'N/A') . '</code></td></tr>';
+        echo '<tr><th>Multisite subsite ID</th><td>' . esc_html($subsite_id) . '</td></tr>';
+        echo '<tr><th>Licence key</th><td><code>' . esc_html($active ? ($masked_license_key !== '' ? $masked_license_key : 'Stored') : 'Not set') . '</code></td></tr>';
         echo '<tr><th>Last API error</th><td>' . esc_html($last_error !== '' ? $last_error : 'None') . '</td></tr>';
         echo '</tbody></table>';
 
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:20px;max-width:860px;background:#fff;padding:20px">';
-        wp_nonce_field('bspc_activate_' . $this->config['product_slug']);
-        echo '<input type="hidden" name="action" value="bspc_activate_' . esc_attr($this->config['product_slug']) . '">';
-        echo '<label><strong>Licence Key</strong><br><input name="license_key" class="regular-text" required autocomplete="off" value="' . esc_attr((string) ($state['license_key'] ?? '')) . '"></label>';
-        echo '<p><button class="button button-primary">Activate Licence</button></p>';
-        echo '</form>';
-
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:12px;display:inline-block;margin-right:12px">';
-        wp_nonce_field('bspc_recheck_' . $this->config['product_slug']);
-        echo '<input type="hidden" name="action" value="bspc_recheck_' . esc_attr($this->config['product_slug']) . '">';
-        echo '<button class="button">Recheck Licence</button>';
-        echo '</form>';
+        if (!$active) {
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:20px;max-width:860px;background:#fff;padding:20px">';
+            wp_nonce_field('bspc_activate_' . $this->config['product_slug']);
+            echo '<input type="hidden" name="action" value="bspc_activate_' . esc_attr($this->config['product_slug']) . '">';
+            echo '<label><strong>Licence Key</strong><br><input name="license_key" class="regular-text" required autocomplete="off" value=""></label>';
+            echo '<p><button class="button button-primary">Activate Licence</button></p>';
+            echo '</form>';
+        }
 
         if ($active) {
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:12px;display:inline-block;margin-right:12px">';
+            wp_nonce_field('bspc_recheck_' . $this->config['product_slug']);
+            echo '<input type="hidden" name="action" value="bspc_recheck_' . esc_attr($this->config['product_slug']) . '">';
+            echo '<button class="button">Recheck Licence</button>';
+            echo '</form>';
+
             echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin-top:12px;display:inline-block">';
             wp_nonce_field('bspc_deactivate_' . $this->config['product_slug']);
             echo '<input type="hidden" name="action" value="bspc_deactivate_' . esc_attr($this->config['product_slug']) . '">';
@@ -239,6 +318,10 @@ final class BSPC_Client {
             wp_die('Unauthorised');
         }
 
+        if (!$this->ensure_subsite_context()) {
+            wp_die('Licence actions are only available from the current subsite dashboard.');
+        }
+
         check_admin_referer('bspc_activate_' . $this->config['product_slug']);
 
         $state = $this->state();
@@ -250,6 +333,7 @@ final class BSPC_Client {
         if (!empty($result['success'])) {
             $state['activation_id'] = sanitize_text_field((string) ($result['activation_id'] ?? ''));
             $state['activation_token'] = sanitize_text_field((string) ($result['activation_token'] ?? ''));
+            $state['masked_license_key'] = $this->mask_secret((string) $state['license_key']);
             $this->apply_status_fields($state, $result);
             $state['last_error'] = '';
 
@@ -258,6 +342,7 @@ final class BSPC_Client {
             }
 
             $this->save($state);
+            delete_transient($this->update_cache_key());
             delete_site_transient('update_plugins');
             wp_safe_redirect(add_query_arg('bspc_message', 'Licence activated.', $url));
             exit;
@@ -274,6 +359,10 @@ final class BSPC_Client {
             wp_die('Unauthorised');
         }
 
+        if (!$this->ensure_subsite_context()) {
+            wp_die('Licence actions are only available from the current subsite dashboard.');
+        }
+
         check_admin_referer('bspc_deactivate_' . $this->config['product_slug']);
 
         $state = $this->state();
@@ -288,8 +377,10 @@ final class BSPC_Client {
             $state['expires_at'] = '';
             $state['last_error'] = '';
             $state['last_checked_at'] = current_time('mysql');
+            $state['masked_license_key'] = '';
 
             $this->save($state);
+            delete_transient($this->update_cache_key());
             delete_site_transient('update_plugins');
             wp_safe_redirect(add_query_arg('bspc_message', 'Licence deactivated.', $url));
             exit;
@@ -304,6 +395,10 @@ final class BSPC_Client {
     public function recheck_action(): void {
         if (!current_user_can($this->config['settings_capability'])) {
             wp_die('Unauthorised');
+        }
+
+        if (!$this->ensure_subsite_context()) {
+            wp_die('Licence actions are only available from the current subsite dashboard.');
         }
 
         check_admin_referer('bspc_recheck_' . $this->config['product_slug']);
@@ -324,6 +419,10 @@ final class BSPC_Client {
     }
 
     private function update_data(bool $force = false): array {
+        if (!$this->ensure_subsite_context()) {
+            return [];
+        }
+
         $state = $this->state();
 
         if (empty($state['activation_id']) || empty($state['activation_token']) || empty($state['license_key'])) {
@@ -427,6 +526,10 @@ final class BSPC_Client {
 
     public function admin_notice(): void {
         if (!current_user_can($this->config['settings_capability'])) {
+            return;
+        }
+
+        if (!$this->ensure_subsite_context()) {
             return;
         }
 
