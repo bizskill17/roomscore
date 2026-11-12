@@ -3847,13 +3847,18 @@ body.hrim-blank-body .hrim-app-shell .hrim-main .hrim-content button.hrim-remark
 
 
 /* v3.14.90: sidebar Logout uses active theme colour */
+/* v3.20.20: sidebar Logout is red with space below the user name */
+.hrim-app-shell .hrim-sidebar-user div{gap:8px!important}
 .hrim-app-shell .hrim-sidebar-user a{
-  color:var(--hrim-accent)!important;
+  display:inline-block;
+  margin-top:4px;
+  color:#ef4444!important;
+  font-weight:600;
 }
 .hrim-app-shell .hrim-sidebar-user a:hover,
 .hrim-app-shell .hrim-sidebar-user a:focus{
-  color:var(--hrim-accent)!important;
-  filter:brightness(.9)!important;
+  color:#dc2626!important;
+  filter:none!important;
 }
 
 
