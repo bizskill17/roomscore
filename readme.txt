@@ -1,12 +1,297 @@
-= 3.16.29 =
-* Integrated bundled BizSkill Plugin Client SDK for licence activation and commercial update delivery.
-* Added Room Score -> Licence admin screen with activate, deactivate and recheck actions plus status details.
-* Removed GitHub token-based updater path from Room Score runtime.
+* v3.19.23: System Vs Security rows are now clickable and expand inline to show floor-wise Security and System counts in a detail table.
+* v3.19.22: Security Occupancy status colors now use explicit saved-state rendering plus inline priority styling, so selected Yes is always green and selected No is always red even when locked or overridden by the theme/cache.
+* v3.19.21: Fixed Security Occupancy saved/locked status highlighting so Yes remains green and No remains red, including older records with mixed-case status values.
+* v3.19.20: Fixed System Occupancy Count list so the System Count column shows the running total of saved floor-wise counts immediately, including existing partial floor entries.
+* v3.19.18: Removed the 'Enter count' hint from System Occupancy floor inputs and now shows the latest update timestamp after each saved floor count. The existing 5-minute auto-lock remains unchanged.
+* v3.19.17: Removed Department from Checklist Sections table and Add/Edit Section form. Checklist Sections now save without department assignment.
+* v3.19.16: Usernames can now be edited from Edit User. Email is optional in Add/Edit User and user import.
+* v3.19.15: Removed Department field/restriction from Users. All application users now see data across all departments; per-view access settings remain available.
+* v3.19.13: System Occupancy Count now shows one direct number field per floor, auto-saves after entry, removes the per-floor Update button, and disables each field after its 5-minute edit window.
+= 3.19.10 =
+* Asset Applicable Checkpoints now default every Show checkbox to selected.
+* Checkpoints are excluded only when the user explicitly unticks them and saves the Asset.
+* Automatically repairs Assets affected by the earlier all-checkpoints-excluded behaviour.
+* Newly selected Sections retain all new checkpoints by default until deliberately changed.
 
-= 3.16.28 =
-* Added GitHub automatic update support for RoomScore.
-* Added private repository authentication via ROOMSCORE_GITHUB_TOKEN.
-* Configured updates to use GitHub Release ZIP assets for WordPress update packages.
+= 3.19.09 =
+* Install Checklist Library now synchronizes each supplied Section instead of only adding missing checkpoints.
+* Extra checkpoints left by an older library are removed from the active master; historically used records remain hidden.
+* Checklist library version 2.1 re-enables Install Library once so existing sites can run the cleanup synchronization.
+
+= 3.19.08 =
+* Checklist Sections now counts only active master-library checkpoints, matching the Sectionwise Checklists count exactly.
+* Hidden historical and asset-specific question records are excluded from the displayed Checklist Points total.
+
+= 3.19.07 =
+* Added one-time upgrade cleanup for the two retired default Sections: Bathroom Amenities and Housekeeping Final Room Check.
+* Historical checkpoint records already used in inspections or issues are retained invisibly.
+
+= 3.19.06 =
+* Install Checklist Library now creates the nine supplied room-inspection Sections and all 64 checkpoints under their correct Sections.
+* Standardised obvious spelling and display labels in the installed checklist master.
+
+= 3.19.05 =
+* Deleting a Checklist Section now removes its unused checklist points and direct Asset/Periodic/legacy assignments automatically.
+* Checkpoints already used in inspections, issues or periodic history are retained invisibly to preserve historical records.
+
+= 3.19.04 =
+* Removed the Sections and Checklist Points deletion option completely from Settings.
+* Rebuilt Checklist Sections with an explicit seven-column grid so Date and Section cannot overlap.
+
+= 3.19.03 =
+* Increased and separated the Date and Section columns in Checklist Sections to prevent overlapping and keep both values clearly readable.
+
+= 3.19.02 =
+* Simplified the Settings action wording to Delete Sections & Checklist Points with a Delete button.
+
+= 3.19.01 =
+* Added Delete All Sections & Checklist Points at the bottom of Settings → Application.
+* The destructive action requires confirmation, clears all current section/checkpoint configuration and asset applicability, and retains existing inspections and issues.
+
+= 3.19.00 =
+* Removed the Inspection Template master, menu and generated page.
+* Assets now select applicable Sections directly, and inspections load checkpoints from those Sections.
+* Existing template assignments are migrated automatically to direct Asset–Section assignments while historical inspection data is preserved.
+* Updated Asset CSV import, dummy setup and training guidance for the direct Section workflow.
+
+= 3.17.69 =
+* Fixed Inspection In Progress page freeze by removing the recursive detail-row MutationObserver.
+
+= 3.17.67 =
+* Inspection In Progress section rows stay hidden until the View action is clicked.
+
+= 3.17.64 =
+* All filter panels now start collapsed on every view and open only when the Filter button is clicked.
+
+= 3.17.63 =
+* Increased Sectionwise Checklist checkpoint width on desktop and added safe wrapping on desktop and mobile to prevent overlap with action controls.
+
+= 3.17.62 =
+* Kept Inspection In Progress section details collapsed by default; opening one section hides other section rows.
+* Removed the Action column from System Vs Security.
+* Positioned all table sort indicators immediately to the right of header text.
+
+= 3.17.60 =
+* Added mobile View action for Inspection In Progress, accordion-only detail opening, and hid the checkpoint Answer column on mobile.
+
+= 3.17.59 =
+* Restored a stable searchable Asset dropdown on mobile, with the search box and scrollable options shown directly below the field.
+
+= 3.17.58 =
+* Simplified Sectionwise Checklist columns, optimized mobile Template columns, and moved the single Property Name into Settings while removing the Properties view.
+
+= 3.17.57 =
+* Replaced the custom Perform Asset Inspection picker with the native mobile select to permanently avoid clipping and sidebar overlay conflicts. Desktop retains the searchable picker.
+
+= 3.17.56 =
+* Removed Description fields and columns from Asset Types, Departments and Checklist Sections.
+* Removed Applicability from the Periodic Tasks list view.
+
+= 3.17.55 =
+* Refreshed the searchable Perform Asset Inspection dropdown immediately after AJAX-loaded Asset options are populated, so all Asset Type - Asset values appear correctly.
+
+= 3.17.54 =
+* Positioned the Perform Asset Inspection Asset dropdown against the mobile viewport so its search and options remain fully visible without overlapping the sidebar.
+
+= 3.17.53 =
+* Restored the Perform Asset Inspection dropdown to normal in-form positioning on mobile, kept search and options visible, and prevented it from appearing above the mobile sidebar.
+
+= 3.17.52 =
+* Fixed the Perform Asset Inspection dropdown on mobile so it opens above all page containers, remains fully visible, and automatically positions below or above the Asset field based on available screen space.
+
+= 3.17.51 =
+* Renamed Security Occupancy modal heading to Room No., changed System Occupancy Count action buttons to edit icons, hid Communications from mobile navigation, improved Learn mobile spacing, and removed Regenerate Pages and Repair Application from Settings.
+
+= 3.17.50 =
+* Improved the Perform Asset Inspection dropdown, changed its placeholder to Select, displayed options as Asset Type - Asset, removed Overall Remarks, and shortened every section action button to Save.
+
+= 3.17.49 =
+* Renamed Office Count to System Count, simplified floor modal titles, renamed Room No., and added a three-column Date/Security/System mobile view for System Vs Security.
+
+= 3.17.47 =
+* Changed the Security Occupancy Count date to formats such as 6 Aug 2026 and made it larger in the theme colour.
+* Renamed Add Occupancy to Security Occupancy Count, Update Office Count to System Occupancy Count, and Occupancy Check to System Vs Security.
+
+= 3.17.47 =
+* Removed the Floor Score view from the sidebar, page regeneration, Settings, and Learn links. Existing Floor Score URLs now open Room Score instead.
+
+= 3.17.45 =
+* Reduced the Checkpoint column width in Inspection In Progress mobile detail and enabled clean text wrapping inside checkpoint cells.
+
+= 3.17.43 =
+* Increased the Section column width further in the Inspection In Progress mobile section summary.
+
+= 3.17.42 =
+* Forced Inspection In Progress checkpoint sections to collapse on load and open only on Section click, with explicit show/hide handling to avoid cache/CSS conflicts.
+
+= 3.17.41 =
+* Kept section checkpoint details hidden by default in Inspection In Progress and open them only when the matching section row is clicked.
+
+= 3.17.40 =
+* Moved checkpoint Status to the final column and increased the Section column width and text size in Inspection In Progress mobile details.
+
+= 3.17.39 =
+* Fixed Schedule Tasks In Progress deletion by retaining a cancelled tombstone so the recurring generator cannot immediately recreate the deleted due cycle.
+* Deleted cycles are excluded from schedule lists and dashboard counts.
+
+= 3.17.38 =
+* Increased the Section column width and section-name text size in Inspection In Progress mobile detail tables.
+
+= 3.17.37 =
+* Reduced the Total, Answered, Pending and Status column widths in Inspection In Progress mobile detail tables, and widened the Section and Checkpoint columns for clearer reading.
+
+= 3.17.36 =
+* Rebuilt the Periodic Task detail table with an explicit colgroup and fixed readable widths so Asset Category, Asset, Task, Status, dates, remarks and Action remain separate and clear on mobile.
+
+= 3.17.35 =
+* Changed Inspection In Progress mobile view to use the complete desktop-style tables with all columns restored and horizontal scrolling.
+
+= 3.17.34 =
+* Renamed and separated Periodic Task detail columns as Asset Category and Asset, with clear mobile widths and non-overlapping data.
+
+= 3.17.33 =
+* Removed mobile card conversion from Inspection In Progress and restored readable table layouts for checkpoint details.
+* Improved Notification Rules & Triggers mobile table alignment, column widths, checkboxes, and interval fields.
+
+= 3.17.32 =
+* Removed frozen and sticky first-column behaviour from every table view on mobile and desktop.
+
+= 3.17.31 =
+* Displayed in-progress inspection checkpoints in a proper table with single-line headers.
+* Fixed the Perform Asset Inspection mobile dropdown position, width and visibility.
+
+= 3.17.30 =
+* Removed extra blank/spacer rows from mobile tables and disabled frozen columns in all Dashboard tables so every column can scroll and remain readable.
+
+= 3.17.29 =
+* Rebuilt the Inspection In Progress mobile UI with stable column alignment and checkpoint cards showing the status icon on the left and checkpoint text on the right.
+
+= 3.17.28 =
+* Prevented mobile table data from overlapping adjacent columns across all views. Long values now wrap inside their own cells, and action icons remain in one row.
+
+= 3.17.27 =
+* Fixed remaining mobile Dashboard header overlap and Inspection In Progress detail/card clipping.
+
+= 3.17.26 =
+* Improved mobile table readability across all views, fixed Department-wise Issue Count, removed duplicate Update Office Count output, wrapped long data, and kept Action icons in one horizontal row.
+
+= 3.17.25 =
+* Refined the Inspection In Progress mobile UI with a readable summary table and card-style expandable checklist details.
+
+= 3.17.24 =
+* Improved every mobile table view so headers and row values remain readable, with sensible column widths and horizontal scrolling only when required.
+
+= 3.17.23 =
+* Standardized table headers across all views so column names wrap cleanly and remain fully visible on mobile and desktop.
+
+= 3.17.22 =
+* Moved pagination below the table or card records in every view, including Room Score and Floor Score on mobile.
+
+= 3.17.21 =
+* Standardized mobile toolbars across all views so the search field and action icons remain in one line with matching 36 px dimensions.
+
+= 3.17.20 =
+* Enforced transparent pagination buttons directly in generated markup; only the current page number uses the theme colour.
+
+= 3.17.19 =
+* Forced all non-selected pagination numbers to plain text and the selected page number to theme-colour text without any background.
+
+= 3.17.18 =
+* Updated pagination active-page style to remove the background and show only the selected page number in the theme colour.
+
+= 3.17.17 =
+* Fixed pagination buttons stretching on mobile. Only the selected page now uses the theme-colour background; all other pages remain compact plain numbers.
+
+= 3.17.16 =
+* Removed pagination scrolling and restyled unselected pages as plain numbers; only the selected page uses the theme-colour background.
+
+= 3.17.15 =
+* Removed the rows-per-page dropdown from pagination on desktop and mobile. Pagination now keeps the default 20 rows per page.
+
+= 3.17.14 =
+* Applied the reference-style pagination with rounded white container, grey chevrons, ellipsis, and theme-colour selected page on mobile and desktop.
+
+= 3.17.13 =
+* Kept the complete mobile pagination control in one line and made the active page clearly visible with the theme-colour background.
+
+= 3.17.12 =
+* Updated pagination to use the same style on desktop and mobile, based on the shared reference: rows-per-page dropdown, chevron navigation, ellipsis, and theme-colour active page.
+
+= 3.17.11 =
+* Corrected mobile pagination UI so Previous, page numbers, and Next remain visible in one compact row.
+* Preserved the white active-page background with theme-colour text and outline.
+
+= 3.17.10 =
+* Updated pagination UI to stay in one line, with the selected page shown as white background, theme-colour text, and theme-colour outline.
+
+= 3.17.09 =
+* Updated the selected pagination page to use theme-colour text, white background, and a theme-colour outline.
+
+= 3.17.08 =
+* Refreshed pagination UI across desktop and mobile views with cleaner alignment, compact row input, and better page-button layout.
+
+= 3.17.07 =
+* Rebuilt pagination visibility using inline important hiding so responsive table CSS cannot reveal records from other pages.
+* Pagination now scrolls back to the beginning of the table or card list after changing pages.
+* The active page remains disabled and non-clickable.
+
+= 3.17.06 =
+* Fixed pagination row visibility across all desktop and mobile table views.
+* Current page is visibly disabled and non-clickable.
+
+= 3.17.05 =
+* Fixed pagination buttons in views where they were inside forms by explicitly using non-submit buttons.
+* Disabled the currently selected page button and added a clear active-page state.
+* Improved Previous, Next, and numbered-page click handling across all paginated tables.
+
+= 3.17.04 =
+* Fixed mobile pagination controls for Room Score and Floor Score card views.
+* Removed the Rows per page text and dropdown.
+* Added a compact typed row-count box matching the pagination button size.
+
+= 3.17.03 =
+* Fixed pagination across all table views, including Room Score and Floor Score.
+* Rows-per-page selection now paginates both desktop tables and mobile score cards consistently.
+
+= 3.17.02 =
+* Added a Rows per page selector to paginated tables with 20, 50, 100 and All options.
+* Kept 20 rows as the default and reset pagination to page 1 when the selection changes.
+
+= 3.17.01 =
+* Fixed clipped and unclear mobile table headers by allowing proper wrapping and column width.
+* Reinforced mobile card-only display for Room Score and Floor Score.
+
+= 3.17.00 =
+* On mobile, Room Score and Floor Score now show only the card view; the table view is hidden.
+
+= 3.16.99 =
+* Standardized all mobile Add, Download, Filter and row-action icon buttons to the same 36px square size with centred 16px icons.
+
+= 3.16.98 =
+* Refined the mobile UI for Communications and Settings with compact checkbox rows, cleaner section spacing, aligned action buttons, and simplified maintenance controls.
+
+= 3.16.97 =
+* Removed mobile card styling from Learn, Communications and Settings views.
+* These views now use a clean standard mobile layout without card borders, rounded corners or shadows.
+
+= 3.16.96 =
+* Moved the section-selection checkbox to the right side in the Edit Template modal on mobile.
+
+= 3.16.95 =
+* Reduced the SL column width in the Sectionwise Checklist table while keeping serial numbers centred.
+
+= 3.16.94 =
+* Removed the mobile card view from Periodic Tasks.
+* Periodic Tasks now uses only the table view on mobile and desktop.
+* Updated the plugin/cache version so the revised mobile layout loads immediately.
+
+= 3.16.93 =
+* Fixed mobile Action columns across all table views so action icons remain fully visible in one row.
+
+= 3.16.91 =
+* Added an Asset Type dropdown below Applicability in Add and Update Periodic Task forms.
+* Applicability categories are filtered by the selected Asset Type.
+* Periodic task room generation now respects the selected Asset Type.
 
 = 3.14.41 =
 - Removed the record-count text below Schedule Tasks In Progress and Schedule Tasks History.
@@ -50,7 +335,7 @@
 
 === Room Score ===
 Contributors: BizSkill
-Stable tag: 3.16.29
+Stable tag: 3.16.01
 Requires at least: 6.0
 Requires PHP: 7.4
 
@@ -163,10 +448,65 @@ Frontend-first hotel room inspection application with a blank theme-independent 
 
 == Changelog ==
 
+= 3.19.20 =
+* Security Occupancy Count now shows a Timestamp column after Status on desktop/tablet.
+* Timestamp is hidden on mobile.
+* Selected Yes is green and selected No is red, including after the 5-minute lock.
+
+
+= 3.18.36 =
+* Renamed Scheduled Tasks In Progress to Due Periodic Tasks across user-facing labels.
+
+
+= 3.17.97 =
+* Replaced the Users Status dropdown with a compact theme-colour toggle switch.
+* Active users show the switch ON in the RoomScore theme colour; inactive users show it OFF.
+* Status changes still save immediately when the switch is clicked.
+
+= 3.17.96 =
+* Dashboard Open Issues KPI renamed to Pending Issues.
+* Clicking the Pending Issues KPI now opens the Pending Issues view directly.
+
+= 3.17.95 =
+* Dashboard Pending Issues, Delayed Issues and Resolved Issues now force visibly wider SL, Date, Floor, Asset and Section columns using uncached inline dashboard CSS.
+* Kept single-word headers and sort indicators on one line.
+
+= 3.17.94 =
+* Dashboard Pending, Delayed and Resolved Issues now visibly widen SL, Date, Floor, Asset and Section columns using fixed percentage allocation within the dashboard card.
+* Kept single-word headers and sort indicators on one line.
+
+
+= 3.17.93 =
+* Dashboard: increased SL, Date, Floor, Asset and Section column widths in Pending, Delayed and Resolved Issues tables.
+
+= 3.17.92 =
+* Dashboard Pending, Delayed and Resolved issue headers now keep the complete header text and sorting icon on the same physical line.
+* Increased desktop column widths and enforced a real minimum table width so Section, Checkpoint and other headers are no longer squeezed or split.
+* Dashboard issue tables scroll horizontally when needed instead of compressing header cells.
+
+= 3.17.91 =
+* Dashboard Pending Issues, Delayed Issues and Resolved Issues now keep every single-word header and its sorting icon on the same line.
+* Increased compact dashboard issue column widths so Date, Floor, Room, Section, Assigned To and Due/Resolved Date do not split unnecessarily.
+* Sorting indicators remain inline with the header text instead of dropping to a second line.
+
+= 3.17.90 =
+* Dashboard Pending Issues, Delayed Issues and Resolved Issues headers now remain on one line on desktop.
+* Increased widths for Date, Floor, Room, Section, Assigned To and Due/Resolved Date while preserving larger Checkpoint and Issue columns.
+* Dashboard issue tables now use horizontal overflow only when required instead of squeezing/wrapping headers.
+
+= 3.17.89 =
+* Dashboard Pending Issues, Delayed Issues and Resolved Issues now use balanced column widths and right-aligned sorting indicators, including the final date column.
+* Recent Inspections now uses a clear Dashicons eye for the View action.
+
+
 = 3.16.29 =
-* Integrated bundled BizSkill Plugin Client SDK for licence activation and commercial update delivery.
-* Added Room Score -> Licence admin screen with activate, deactivate and recheck actions plus status details.
-* Removed GitHub token-based updater path from Room Score runtime.
+* Removed all internal table/grid borders from Room Score and Floor Score mobile cards.
+* Kept only the outer card border and a clean header divider.
+* Improved label/value spacing for a true card layout on mobile.
+
+= 3.16.28 =
+* Added a unified, proper mobile card layout for Room Score, Floor Score, Update Office Count and Occupancy Check.
+* Removed mobile horizontal scrolling and improved labels, spacing, actions and status readability.
 
 = 3.16.05 =
 * Keep the Edit Asset modal open after removing a checkpoint.
@@ -199,7 +539,7 @@ Frontend-first hotel room inspection application with a blank theme-independent 
 * Newly saved periodic tasks now redirect to and appear in the Periodic Tasks register.
 * Fixed periodic task edit, delete, and room-completion forms to use the correct WordPress action endpoint.
 = 3.14.5 =
-* Reordered the Periodic Tasks submenu so Add Periodic Tasks appears before Periodic Tasks.
+* Reordered the Periodic Tasks submenu so Add Periodic Task appears before Periodic Tasks.
 * Removed the duplicate Add Periodic Task button from the Periodic Tasks register view.
 
 
@@ -749,3 +1089,111 @@ Version 3.8.21
 = 3.16.27 =
 * Refined Room Score and Floor Score mobile cards with a cleaner corporate style.
 * Removed inner borders inside mobile score cards for a smoother and more premium look.
+
+= 3.16.72 =
+* Made popup close controls across the mobile app show as a plain small top-right ×.
+* Removed orange pill / long-button styling from mobile popup close controls.
+* Updated asset version for cache refresh.
+
+= 3.16.73 =
+* Add Occupancy now includes only assets whose Asset Type is Room.
+* Update Office Count uses a three-column table on mobile instead of cards.
+* Occupancy Check uses table view on mobile instead of cards.
+* Updated asset version for cache refresh.
+
+= 3.16.74 =
+* Displayed Add Occupancy Yes/No controls side-by-side with compact button widths on mobile.
+* Rebuilt Update Office Count as a clean three-column mobile table.
+* Restored Occupancy Check as a proper horizontally scrollable table on mobile.
+* Updated asset version for cache refresh.
+
+= 3.16.75 =
+* Fit Date, Office Count and Action columns within one mobile screen.
+* Reduced mobile column padding and action-button size for Update Office Count.
+
+= 3.16.76 =
+* Forced Date, Office Count and Action columns to fit on one mobile screen.
+* Added clearly visible borders around all Update Office Count table cells.
+* Added explicit mobile column widths and cache-version refresh.
+
+= 3.16.77 =
+* Added a dedicated mobile-only three-column Update Office Count table so Date, Office Count and Action always fit on one screen.
+* Added clear dark borders to every header and data cell.
+* Updated cache-busting version.
+
+= 3.16.78 =
+* Strengthened mobile table borders for Update Office Count and Occupancy Check.
+* Changed mobile action buttons from blue/white to the active theme colour with white icons.
+* Updated asset version for cache refresh.
+
+= 3.16.79 =
+* Removed mobile card mode from Issue Management, Pending Assign Issue, Pending Issues and Issue Resolved.
+* Restored normal horizontally scrollable table view with clear cell borders on mobile.
+* Updated asset version for cache refresh.
+
+= 3.16.80 =
+* Corrected all custom dropdown and multiselect panels on mobile so they open directly below the field.
+* Removed fixed/centred mobile dropdown positioning that caused panels to appear above fields.
+* Updated asset version for cache refresh.
+
+
+= 3.16.81 =
+* Made the Issue Management, Pending Assign Issue, Pending Issues, and Issue Resolved mobile top action area compact so actions fit properly on one screen.
+* Changed the mobile Add Issue button to a compact plus icon style matching the other toolbar icons.
+
+
+= 3.16.82 =
+* Fixed mobile forms spilling outside the white modal background.
+* All mobile modal forms now expand to their complete content height with a clear white background, border, and shadow.
+* Improved field borders and kept form controls visibly separated from the modal overlay.
+
+
+= 3.16.83 =
+* Removed the duplicate upper table from Update Office Count on mobile.
+* Kept only the dedicated three-column mobile table.
+* Centred the Update Office Count form in the mobile viewport.
+
+
+= 3.16.89 =
+* Reduced the SL column width consistently in all Master table views on desktop and mobile.
+
+= 3.16.88 =
+* Forced every mobile row action button to exactly match the top plus, filter and download button size.
+
+= 3.16.85 =
+* Standardized all mobile action icon buttons to the same size as the plus icon across all views.
+
+= 3.16.84 =
+* Mobile action buttons now display clearly in a single left-to-right row across all table views.
+* Standardized mobile action icon buttons to 32px and widened the Action column where required.
+
+
+= 3.16.90 =
+* Removed Download Template and Upload Template actions from mobile Master views, including the bottom action area.
+* Kept both template actions available on desktop.
+
+= 3.18.07 =
+* Fixed desktop Show/Hide Menu to fully hide and restore the left sidebar.
+* Moved periodic schedule views under Periodic Tasks and renamed them Upcoming Periodic Tasks and Due Periodic Tasks.
+* Security Occupancy Count date displays with a comma after the month, e.g. 8 Aug, 2026.
+
+= 3.18.09 =
+* Show/Hide Menu navigation no longer displays the global loading spinner.
+
+= 3.19.12 =
+* System Occupancy Count is now updated floor-wise using the same floor list as Security Occupancy Count. The total System Count is calculated automatically after all floors are entered.
+
+
+== 3.19.29 ==
+* Improved Add Issue mobile modal layout.
+* Fixed searchable dropdown panels overlapping Room/Department/Section fields on small screens.
+* Search dropdown now opens above all form controls with touch-friendly sizing and scrolling.
+
+
+== 3.19.31 ==
+* Add Issue: Asset placeholder simplified to “Select”.
+* Add Issue: Floor is now mandatory in both UI and server validation.
+* Add Issue: Assign To is read-only and automatically shows/uses the selected Department Head.
+== 3.19.30 ==
+* Fixed Add Issue searchable dropdowns on mobile so the option panel opens directly below the selected field instead of covering the top of the form.
+* Reduced mobile dropdown height and added internal scrolling for long lists.

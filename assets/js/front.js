@@ -5,6 +5,8 @@
   function hrimShowSpinner(label){
     var $spinner=$('#hrimGlobalSpinner');
     if(!$spinner.length)return;
+    // Keep the spinner at document-body level so no modal/transform stacking context can cover it.
+    if($spinner.parent()[0]!==document.body)$spinner.appendTo(document.body);
     window.clearTimeout(hrimSpinnerTimer);
     if(label)$spinner.find('span').text(label);
     $spinner.addClass('is-active').attr('aria-hidden','false');
@@ -24,6 +26,17 @@
   }
   window.hrimShowSpinner=hrimShowSpinner;
   window.hrimHideSpinner=hrimHideSpinner;
+
+  // v3.19.73: pressing Enter inside ordinary form fields must not auto-submit forms.
+  // Explicit submit buttons still work normally; textarea Enter remains available for new lines.
+  $(document).on('keydown','form input, form select, form [contenteditable="true"]',function(e){
+    if(e.key!=='Enter' && e.keyCode!==13)return;
+    var $target=$(e.target);
+    if($target.is('button,[type="submit"],[type="button"],[type="image"]'))return;
+    if($target.closest('[data-allow-enter-submit]').length)return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
 
   // v3.15.96: save/update/delete records without refreshing the complete application shell.
   // WordPress admin-post handlers may continue using their existing redirects; the
@@ -139,8 +152,20 @@
   });
   window.addEventListener('pageshow',function(e){if(e.persisted){window.location.reload();}});
   try{if(window.performance&&performance.getEntriesByType){var nav=performance.getEntriesByType('navigation')[0];if(nav&&nav.type==='back_forward'){window.location.reload();}}}catch(e){}
-  $(document).on('click','.hrim-menu-toggle',function(){$('#hrimSidebar').toggleClass('open');});
-  $(document).on('click','.hrim-sidebar-mobile-close',function(){$('#hrimSidebar').removeClass('open');});
+  $(document).on('click','.hrim-menu-toggle',function(){
+    var $sidebar=$('#hrimSidebar');
+    $sidebar.toggleClass('open');
+    $('.hrim-app-shell').toggleClass('hrim-mobile-menu-open',$sidebar.hasClass('open'));
+  });
+  $(document).on('click','.hrim-sidebar-mobile-close',function(){
+    $('#hrimSidebar').removeClass('open');
+    $('.hrim-app-shell').removeClass('hrim-mobile-menu-open');
+  });
+  $(document).on('click','#hrimSidebar a[href]',function(){
+    if(window.matchMedia('(max-width: 760px)').matches){
+      $('.hrim-app-shell').removeClass('hrim-mobile-menu-open');
+    }
+  });
 
   // v3.15.24: expand the sidebar section that contains the current view; keep all others collapsed.
   $('.hrim-nav-group').each(function(){
@@ -191,30 +216,44 @@
     window.addEventListener('pagehide',saveSidebarScroll);
   })();
 
-  // v3.9.04: desktop show/hide sidebar toggle.
+  // v3.18.06: robust desktop show/hide sidebar toggle.
+  // front.js is loaded in the document head, so bind the click through delegation and
+  // resolve the shell/button only when the DOM exists. This also survives AJAX view swaps.
   (function(){
     var storageKey='roomscore_sidebar_collapsed';
-    var $shell=$('.hrim-app-shell');
-    var $toggle=$('#hrimSidebarCollapseToggle');
-    if(!$shell.length||!$toggle.length)return;
-    function applyCollapsed(collapsed){
-      $shell.toggleClass('hrim-sidebar-collapsed',!!collapsed);
-      $toggle.attr('aria-expanded',collapsed?'false':'true');
-      $toggle.attr({'title':collapsed?'Show Menu':'Hide Menu','aria-label':collapsed?'Show Menu':'Hide Menu'});
-      $toggle.find('.dashicons').toggleClass('dashicons-arrow-left-alt2',!collapsed).toggleClass('dashicons-arrow-right-alt2',!!collapsed);
+    function getParts(){
+      return {$shell:$('.hrim-app-shell'),$toggle:$('#hrimSidebarCollapseToggle')};
     }
-    var collapsed=false;
-    try{collapsed=window.localStorage.getItem(storageKey)==='1';}catch(e){}
-    if(window.matchMedia('(min-width: 761px)').matches)applyCollapsed(collapsed);
-    $toggle.on('click',function(){
-      if(!window.matchMedia('(min-width: 761px)').matches)return;
+    function applyCollapsed(collapsed){
+      var p=getParts();
+      if(!p.$shell.length||!p.$toggle.length)return;
+      p.$shell.toggleClass('hrim-sidebar-collapsed',!!collapsed);
+      p.$toggle.attr('aria-expanded',collapsed?'false':'true');
+      p.$toggle.attr({'title':collapsed?'Show Menu':'Hide Menu','aria-label':collapsed?'Show Menu':'Hide Menu'});
+      p.$toggle.find('.dashicons').toggleClass('dashicons-arrow-left-alt2',!collapsed).toggleClass('dashicons-arrow-right-alt2',!!collapsed);
+    }
+    function storedState(){
+      try{return window.localStorage.getItem(storageKey)==='1';}catch(e){return false;}
+    }
+    $(function(){
+      if(window.matchMedia('(min-width: 761px)').matches)applyCollapsed(storedState());
+    });
+    $(document).on('click','#hrimSidebarCollapseToggle',function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(!window.matchMedia('(min-width: 761px)').matches)return false;
+      var $shell=$('.hrim-app-shell');
+      if(!$shell.length)return false;
       var next=!$shell.hasClass('hrim-sidebar-collapsed');
       applyCollapsed(next);
-      try{window.localStorage.setItem(storageKey,next?'1':'0');}catch(e){}
+      try{window.localStorage.setItem(storageKey,next?'1':'0');}catch(err){}
+      return false;
     });
     $(window).on('resize',function(){
-      if(!window.matchMedia('(min-width: 761px)').matches){$shell.removeClass('hrim-sidebar-collapsed');}
-      else {try{applyCollapsed(window.localStorage.getItem(storageKey)==='1');}catch(e){applyCollapsed(false);}}
+      var $shell=$('.hrim-app-shell');
+      if(!$shell.length)return;
+      if(!window.matchMedia('(min-width: 761px)').matches)$shell.removeClass('hrim-sidebar-collapsed');
+      else applyCollapsed(storedState());
     });
   })();
 
@@ -237,33 +276,53 @@
   function hrimEsc(v){return $('<div>').text(v==null?'':String(v)).html();}
   function hrimEscapeHtml(v){return hrimEsc(v);}
   function hrimEscapeAttr(v){return hrimEsc(v).replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
-  $('#hrimHotel').on('change',function(){
-    var $r=$('#hrimRoom').html('<option>Search...</option>');
+  $('#hrimHotel').on('change',function(e){
+    var $r=$('#hrimRoom');
+    var hotelId=String(this.value||'');
+    var draftRoom=String($r.data('draft-room')||'');
+    var hasPreloaded=$r.find('option[value!=""]').length>0;
     $('#hrimQuestions').empty();
-    $.post(HRIM.ajax,{action:'hrim_get_rooms',nonce:HRIM.nonce,hotel_id:this.value},function(res){
-      $r.html('<option value="">Select Room</option>');
-      if(res.success)res.data.forEach(function(x){$r.append($('<option>',{value:x.id,text:x.floor_name+' – '+x.room_no}));});
-      var draftRoom=String($r.data('draft-room')||'');
+    if(!hotelId){$r.html('<option value="">Select</option>').trigger('hrim-linked-refresh');return;}
+
+    /* Server-preloaded assets make Perform/Continue Inspection work immediately.
+       Refresh through AJAX as a secondary sync, but do not blank the dropdown first. */
+    if(hasPreloaded){
+      $r.trigger('hrim-linked-refresh');
+      if(draftRoom){$r.val(draftRoom).trigger('change');$r.removeData('draft-room');}
+    }
+    $.post(HRIM.ajax,{action:'hrim_get_rooms',nonce:HRIM.nonce,hotel_id:hotelId},function(res){
+      if(!res || !res.success) return;
+      var current=String($r.val()||draftRoom||'');
+      $r.html('<option value="">Select</option>');
+      res.data.forEach(function(x){ var typeName=String(x.asset_type_name||'').trim(); if(!typeName || /^(asset|assets|room|rooms)$/i.test(typeName)) typeName='Room'; var assetLabel=typeName+' - '+x.room_no; $r.append($('<option>',{value:x.id,text:assetLabel})); });
+      if(current && $r.find('option[value="'+current.replace(/"/g,'\"')+'"]').length) $r.val(current);
+      $r.trigger('hrim-linked-refresh');
       if(draftRoom){$r.val(draftRoom).trigger('change');$r.removeData('draft-room');}
     });
   });
   if($('#hrimHotel').length && $('#hrimHotel').val()){
+    var $initialRoom=$('#hrimRoom');
+    var initialDraft=String($initialRoom.data('draft-room')||'');
+    if(initialDraft && $initialRoom.find('option[value="'+initialDraft.replace(/"/g,'\"')+'"]').length){
+      $initialRoom.val(initialDraft).trigger('hrim-linked-refresh').trigger('change');
+      $initialRoom.removeData('draft-room');
+    }
     $('#hrimHotel').trigger('change');
   }
 
-  $('#hrimRoom').on('change',function(){
+  $(document).on('change','#hrimRoom',function(){
     var roomId=this.value,$box=$('#hrimQuestions'),$footer=$('#hrimInspectionFooter');
     if(!roomId){$box.empty();$footer.hide();return;}
     $footer.show();
-    $box.html('<div class="hrim-empty">Loading all assigned checklists...</div>');
+    $box.html('<div class="hrim-empty">Loading selected sections...</div>');
     $.post(HRIM.ajax,{action:'hrim_get_room_checklist',nonce:HRIM.nonce,room_id:roomId},function(res){
       $box.empty();
-      if(!res.success){$box.html('<div class="hrim-alert error">'+hrimEsc(res.data||'Checklist could not be loaded.')+'</div>');return;}
-      if(!res.data.length){$box.html('<div class="hrim-empty">No template is assigned to this room or its room category.</div>');return;}
+      if(!res || !res.success){$box.html('<div class="hrim-alert error">'+hrimEsc((res&&res.data)||'Checklist could not be loaded.')+'</div>');return;}
+      if(!res.data.length){$box.html('<div class="hrim-empty">No section is selected for this asset.</div>');return;}
       res.data.forEach(function(t){
         var $group=$('<section class="hrim-template-group"></section>');
         $group.append('<input type="hidden" name="template_ids[]" value="'+t.id+'">');
-        if(!t.questions.length){$group.append('<div class="hrim-empty">No checklist points found in this template.</div>');}
+        if(!t.questions.length){$group.append('<div class="hrim-empty">No checkpoints were found in the selected sections.</div>');}
         var grouped={};
         t.questions.forEach(function(q){
           var sectionName=q.section_name||'General';
@@ -284,18 +343,37 @@
             }else{
               html+='<textarea name="answers['+t.id+']['+q.id+'][value]"'+req+'></textarea><input type="hidden" name="answers['+t.id+']['+q.id+'][result]" value="pass">';
             }
-            html+='<div class="hrim-response-row"><div class="hrim-row-photo"><label class="hrim-photo-button" title="Add photo"><span class="dashicons dashicons-camera" aria-hidden="true"></span><span class="hrim-action-text">Photo</span><input type="file" accept="image/*" capture="environment" multiple hidden></label><input type="hidden" class="hrim-row-attachment-ids" name="answers['+t.id+']['+q.id+'][attachment_ids]" value=""><div class="hrim-row-photo-preview"></div></div><div class="hrim-row-video"><label class="hrim-video-button" title="Add video up to 1 minute"><span class="dashicons dashicons-video-alt3" aria-hidden="true"></span><span class="hrim-action-text">Video</span><input type="file" accept="video/mp4,video/quicktime,video/webm" capture="environment" hidden></label><input type="hidden" class="hrim-row-video-ids" name="answers['+t.id+']['+q.id+'][video_ids]" value=""><div class="hrim-row-video-preview"></div></div><button type="button" class="hrim-remarks-toggle" title="Remarks" aria-expanded="false"><span class="dashicons dashicons-admin-comments" aria-hidden="true"></span><span class="hrim-action-text">Remarks</span></button></div>'+(q.question_type==='yes_no'?'</div>':'')+'<textarea class="hrim-checkpoint-remarks" name="answers['+t.id+']['+q.id+'][remarks]" placeholder="Remarks (optional)"></textarea></div></div>';
+            html+='<div class="hrim-response-row"><div class="hrim-row-photo"><label class="hrim-photo-button" title="Add photo"><span class="dashicons dashicons-camera" aria-hidden="true"></span><span class="hrim-action-text">Photo</span><input type="file" accept="image/*" capture="environment" multiple hidden></label><button type="button" class="hrim-media-view hrim-photo-view" title="View uploaded photo" aria-label="View uploaded photo" hidden><span class="dashicons dashicons-visibility" aria-hidden="true"></span><span class="hrim-action-text">View</span></button><input type="hidden" class="hrim-row-attachment-ids" name="answers['+t.id+']['+q.id+'][attachment_ids]" value=""><div class="hrim-row-photo-preview"></div></div><div class="hrim-row-video"><label class="hrim-video-button" title="Add video up to 1 minute"><span class="dashicons dashicons-video-alt3" aria-hidden="true"></span><span class="hrim-action-text">Video</span><input type="file" accept="video/mp4,video/quicktime,video/webm" capture="environment" hidden></label><button type="button" class="hrim-media-view hrim-video-view" title="View uploaded video" aria-label="View uploaded video" hidden><span class="dashicons dashicons-visibility" aria-hidden="true"></span><span class="hrim-action-text">View</span></button><input type="hidden" class="hrim-row-video-ids" name="answers['+t.id+']['+q.id+'][video_ids]" value=""><div class="hrim-row-video-preview"></div></div><button type="button" class="hrim-remarks-toggle" title="Remarks" aria-expanded="false"><span class="dashicons dashicons-admin-comments" aria-hidden="true"></span><span class="hrim-action-text">Remarks</span></button></div>'+(q.question_type==='yes_no'?'</div>':'')+'<textarea class="hrim-checkpoint-remarks" name="answers['+t.id+']['+q.id+'][remarks]" placeholder="Remarks (optional)"></textarea></div></div>';
             $questions.append(html);
           });
           $section.append($questions);
-          $section.append('<div class="hrim-section-save-wrap"><button type="button" class="hrim-primary hrim-save-section" data-section-name="'+hrimEscapeAttr(sectionName)+'">Save '+hrimEsc(sectionName)+'</button><span class="hrim-section-save-status" aria-live="polite"></span></div>');
+          $section.append('<div class="hrim-section-save-wrap"><button type="button" class="hrim-primary hrim-save-section" data-section-name="'+hrimEscapeAttr(sectionName)+'">Save</button><span class="hrim-section-save-status" aria-live="polite"></span></div>');
           $group.append($section);
         });
         $box.append($group);
       });
       hrimRestoreDraftAnswers();
       hrimUpdateInspectionCompletion();
+    }).fail(function(xhr){
+      var message='Checklist could not be loaded.';
+      try{
+        var payload=JSON.parse(xhr.responseText||'{}');
+        if(payload && payload.data) message=typeof payload.data==='string'?payload.data:message;
+      }catch(err){}
+      $box.html('<div class="hrim-alert error">'+hrimEsc(message)+'</div>');
+      $footer.show();
     });
+  });
+
+  /* v3.18.63: ensure a preselected/draft Asset always loads its inspection form.
+     The previous initial trigger could run before the #hrimRoom change handler was attached. */
+  $(function(){
+    setTimeout(function(){
+      var $room=$('#hrimRoom');
+      if($room.length && String($room.val()||'')!==''){
+        $room.trigger('change');
+      }
+    },50);
   });
 
 
@@ -339,16 +417,22 @@
       $('[name$="['+qid+'][result]"]').val(data.result||'pass');
       $('[name$="['+qid+'][remarks]"]').val(data.remarks||'');
       var ids=Array.isArray(data.attachments)?data.attachments:[];
-      $('[name$="['+qid+'][attachment_ids]"]').val(ids.join(','));
+      var attachmentUrls=Array.isArray(data.attachment_urls)?data.attachment_urls:[];
+      var $photoHidden=$('[name$="['+qid+'][attachment_ids]"]');
+      $photoHidden.val(ids.join(','));
       if(ids.length){
-        var $preview=$('[name$="['+qid+'][attachment_ids]"]').siblings('.hrim-row-photo-preview');
-        ids.forEach(function(id){$preview.append('<span class="hrim-photo-chip" data-id="'+id+'"><span class="dashicons dashicons-format-image"></span><button type="button" aria-label="Remove photo">×</button></span>');});
+        var $preview=$photoHidden.siblings('.hrim-row-photo-preview');
+        ids.forEach(function(id,i){var url=attachmentUrls[i]||'';$preview.append('<span class="hrim-photo-chip" data-id="'+id+'" data-url="'+hrimEscapeAttr(url)+'"><span class="dashicons dashicons-format-image"></span><button type="button" aria-label="Remove photo">×</button></span>');});
+        $photoHidden.siblings('.hrim-photo-view').prop('hidden',false);
       }
       var videoIds=Array.isArray(data.videos)?data.videos:[];
-      $('[name$="['+qid+'][video_ids]"]').val(videoIds.join(','));
+      var videoUrls=Array.isArray(data.video_urls)?data.video_urls:[];
+      var $videoHidden=$('[name$="['+qid+'][video_ids]"]');
+      $videoHidden.val(videoIds.join(','));
       if(videoIds.length){
-        var $videoPreview=$('[name$="['+qid+'][video_ids]"]').siblings('.hrim-row-video-preview');
-        videoIds.forEach(function(id){$videoPreview.append('<span class="hrim-video-chip" data-id="'+id+'"><span class="dashicons dashicons-video-alt3"></span><button type="button" aria-label="Remove video">×</button></span>');});
+        var $videoPreview=$videoHidden.siblings('.hrim-row-video-preview');
+        videoIds.forEach(function(id,i){var url=videoUrls[i]||'';$videoPreview.append('<span class="hrim-video-chip" data-id="'+id+'" data-url="'+hrimEscapeAttr(url)+'"><span class="dashicons dashicons-video-alt3"></span><button type="button" aria-label="Remove video">×</button></span>');});
+        $videoHidden.siblings('.hrim-video-view').prop('hidden',false);
       }
     });
   }
@@ -390,7 +474,8 @@
       $.ajax({url:HRIM.ajax,method:'POST',data:fd,processData:false,contentType:false}).done(function(res){
         if(!res.success){alert(res.data||'Photo upload failed.');return;}
         var ids=String($hidden.val()||'').split(',').filter(Boolean); ids.push(String(res.data.id)); $hidden.val(ids.join(','));
-        $preview.append('<span class="hrim-photo-chip" data-id="'+res.data.id+'"><img src="'+hrimEscapeAttr(res.data.url)+'" alt=""><button type="button" aria-label="Remove photo">×</button></span>');
+        $preview.append('<span class="hrim-photo-chip" data-id="'+res.data.id+'" data-url="'+hrimEscapeAttr(res.data.url)+'"><img src="'+hrimEscapeAttr(res.data.url)+'" alt=""><button type="button" aria-label="Remove photo">×</button></span>');
+        $wrap.find('.hrim-photo-view').prop('hidden',false);
       });
     });
     input.value='';
@@ -398,6 +483,7 @@
   $(document).on('click','.hrim-photo-chip button',function(){
     var $chip=$(this).closest('.hrim-photo-chip'),id=String($chip.data('id')),$wrap=$chip.closest('.hrim-row-photo'),$hidden=$wrap.find('.hrim-row-attachment-ids');
     var ids=String($hidden.val()||'').split(',').filter(function(x){return x&&x!==id;});$hidden.val(ids.join(','));$chip.remove();
+    $wrap.find('.hrim-photo-view').prop('hidden',$wrap.find('.hrim-photo-chip').length===0);
   });
 
   function hrimVideoDuration(file){
@@ -420,15 +506,43 @@
       $.ajax({url:HRIM.ajax,method:'POST',data:fd,processData:false,contentType:false}).done(function(res){
         if(!res.success){alert(res.data||'Video upload failed.');return;}
         var ids=String($hidden.val()||'').split(',').filter(Boolean);ids.push(String(res.data.id));$hidden.val(ids.join(','));
-        $preview.html('<span class="hrim-video-chip" data-id="'+res.data.id+'"><span class="dashicons dashicons-video-alt3"></span><small>'+Math.round(duration)+' sec</small><button type="button" aria-label="Remove video">×</button></span>');
+        $preview.html('<span class="hrim-video-chip" data-id="'+res.data.id+'" data-url="'+hrimEscapeAttr(res.data.url)+'"><span class="dashicons dashicons-video-alt3"></span><small>'+Math.round(duration)+' sec</small><button type="button" aria-label="Remove video">×</button></span>');
+        $wrap.find('.hrim-video-view').prop('hidden',false);
       }).always(function(){hrimHideSpinner();input.value='';});
     }).catch(function(err){alert(err.message||'Unable to read video.');input.value='';});
   });
   $(document).on('click','.hrim-video-chip button',function(){
     var $chip=$(this).closest('.hrim-video-chip'),id=String($chip.data('id')),$wrap=$chip.closest('.hrim-row-video'),$hidden=$wrap.find('.hrim-row-video-ids');
     var ids=String($hidden.val()||'').split(',').filter(function(x){return x&&x!==id;});$hidden.val(ids.join(','));$chip.remove();
+    $wrap.find('.hrim-video-view').prop('hidden',$wrap.find('.hrim-video-chip').length===0);
   });
 
+  function hrimOpenCheckpointMedia(type,urls){
+    urls=(urls||[]).filter(Boolean);
+    if(!urls.length){alert('No uploaded '+type+' is available to view.');return;}
+    var $modal=$('#hrimCheckpointMediaModal');
+    if(!$modal.length){
+      $modal=$('<div id="hrimCheckpointMediaModal" class="hrim-media-modal" aria-hidden="true"><div class="hrim-media-modal-card" role="dialog" aria-modal="true" aria-label="Uploaded media"><button type="button" class="hrim-media-modal-close" aria-label="Close">×</button><div class="hrim-media-modal-content"></div></div></div>');
+      $('body').append($modal);
+    }
+    var $content=$modal.find('.hrim-media-modal-content').empty();
+    urls.forEach(function(url){
+      if(type==='photo') $content.append($('<img class="hrim-media-modal-image" alt="Uploaded inspection photo">').attr('src',url));
+      else $content.append($('<video class="hrim-media-modal-video" controls playsinline preload="metadata"></video>').attr('src',url));
+    });
+    $modal.addClass('open').attr('aria-hidden','false');
+  }
+  $(document).on('click','.hrim-photo-view',function(){
+    var urls=[];$(this).siblings('.hrim-row-photo-preview').find('.hrim-photo-chip').each(function(){var url=String($(this).attr('data-url')||'');if(url)urls.push(url);});hrimOpenCheckpointMedia('photo',urls);
+  });
+  $(document).on('click','.hrim-video-view',function(){
+    var urls=[];$(this).siblings('.hrim-row-video-preview').find('.hrim-video-chip').each(function(){var url=String($(this).attr('data-url')||'');if(url)urls.push(url);});hrimOpenCheckpointMedia('video',urls);
+  });
+  $(document).on('click','.hrim-media-modal-close,.hrim-media-modal',function(e){
+    if(e.target!==this && !$(e.target).hasClass('hrim-media-modal-close'))return;
+    var $modal=$('#hrimCheckpointMediaModal');$modal.find('video').each(function(){try{this.pause();}catch(err){}});$modal.removeClass('open').attr('aria-hidden','true');
+  });
+  $(document).on('keydown',function(e){if(e.key==='Escape'&&$('#hrimCheckpointMediaModal').hasClass('open'))$('.hrim-media-modal-close').trigger('click');});
 
 
   function hrimStyleSelectedResponse($radio){
@@ -533,13 +647,29 @@
     $('#hrimProgressIssueDescription').text($(this).data('issue')||'—');
     $('#hrimProgressIssueLocation').text($(this).data('location')||'');
     var current=$(this).data('status');
-    $('#hrimProgressIssueStatus').val(current==='resolved'?'resolved':'in_progress');
+    $('#hrimProgressIssueStatus').val('resolved');
     $('#hrimProgressIssueRemarks').val($(this).data('resolution')||'');
     $('#hrimProgressIssueModal').addClass('open');
   });
   $(document).on('click','.hrim-view-inspection',function(){var id=$(this).data('target');if(id)$('#'+id).addClass('open');});
+  $(document).on('click','.hrim-in-progress-view',function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var target=$(this).attr('data-target');
+    if(!target) return;
+    var $detail=$('#'+target);
+    var opening=$detail.prop('hidden');
+    $('.hrim-in-progress-detail-row').prop('hidden',true).attr('hidden','hidden').removeClass('hrim-detail-open').css('display','');
+    $('.hrim-in-progress-row').removeClass('is-expanded').attr('aria-expanded','false');
+    hrimCollapseInProgressSections(document);
+    if(opening){
+      $detail.prop('hidden',false).removeAttr('hidden').addClass('hrim-detail-open').css('display','');
+      $('.hrim-in-progress-row[data-target="'+target+'"]').addClass('is-expanded').attr('aria-expanded','true');
+    }
+  });
   $(document).on('click keydown','.hrim-in-progress-row',function(e){
     if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
+    if(window.matchMedia && window.matchMedia('(max-width:760px)').matches) return;
     if($(e.target).closest('a,button,form,input,select,textarea,label').length) return;
     if(e.type==='keydown') e.preventDefault();
     var target=$(this).attr('data-target');
@@ -553,15 +683,84 @@
       $(this).addClass('is-expanded').attr('aria-expanded','true');
     }
   });
-  $(document).on('click','.hrim-section-score-row',function(){
+  function hrimCollapseInProgressSections(root){
+    var $root=$(root||document);
+    $root.find('.hrim-in-progress-inline-detail .hrim-section-score-row')
+      .removeClass('is-active hrim-section-row-hidden')
+      .attr('aria-expanded','false')
+      .show();
+    $root.find('.hrim-in-progress-inline-detail .hrim-section-detail-panel')
+      .removeClass('is-open')
+      .attr('hidden',true)
+      .hide();
+    $root.find('.hrim-in-progress-inline-detail .hrim-section-detail-row')
+      .prop('hidden',true)
+      .hide();
+  }
+  function hrimResetInProgressDetails(root){
+    var $root=$(root||document);
+    $root.find('.hrim-in-progress-detail-row')
+      .prop('hidden',true)
+      .attr('hidden','hidden')
+      .removeClass('hrim-detail-open')
+      .css('display','');
+    $root.find('.hrim-in-progress-row')
+      .removeClass('is-expanded')
+      .attr('aria-expanded','false');
+    hrimCollapseInProgressSections($root);
+  }
+  $(function(){hrimResetInProgressDetails(document);});
+  $(window).on('load',function(){hrimResetInProgressDetails(document);});
+  $(document).on('hrim:content-updated',function(e,root){hrimResetInProgressDetails(root||document);});
+  $(document).on('click keydown','.hrim-section-score-row',function(e){
+    if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
+    if(e.type==='keydown') e.preventDefault();
     var target=$(this).attr('data-target');
     if(!target)return;
     var $panel=$('#'+target);
-    var opening=!$panel.hasClass('is-open');
-    $(this).closest('.hrim-inspection-detail').find('.hrim-section-score-row').removeClass('is-active').attr('aria-expanded','false');
-    $(this).closest('.hrim-inspection-detail').find('.hrim-section-detail-panel').removeClass('is-open').attr('hidden',true);
-    if(opening){$(this).addClass('is-active').attr('aria-expanded','true');$panel.addClass('is-open').removeAttr('hidden');}
+    var $detailRow=$panel.closest('.hrim-section-detail-row');
+    var $detail=$(this).closest('.hrim-inspection-detail');
+    var opening=$detailRow.prop('hidden') || !$panel.hasClass('is-open');
+    $detail.find('.hrim-section-score-row')
+      .removeClass('is-active hrim-section-row-hidden')
+      .attr('aria-expanded','false')
+      .css('display','table-row');
+    $detail.find('.hrim-section-detail-panel').removeClass('is-open').attr('hidden','hidden').css('display','none');
+    $detail.find('.hrim-section-detail-row').prop('hidden',true).attr('hidden','hidden').css('display','none');
+    if(opening){
+      $detail.find('.hrim-section-score-row').not(this)
+        .addClass('hrim-section-row-hidden')
+        .css('display','none');
+      $(this).addClass('is-active').attr('aria-expanded','true').css('display','table-row');
+      $detailRow.prop('hidden',false).removeAttr('hidden').css('display','table-row');
+      $panel.addClass('is-open').removeAttr('hidden').css('display','block');
+    }
   });
+  $(document).on('click','.hrim-mobile-section-summary-row',function(){
+    var target=$(this).attr('data-target');
+    if(!target) return;
+    var $detail=$('#'+target);
+    var opening=$detail.prop('hidden');
+    var $summary=$(this).closest('.hrim-mobile-section-summary');
+    $summary.find('.hrim-mobile-section-summary-row').attr('aria-expanded','false').removeClass('is-active');
+    $summary.find('.hrim-mobile-section-detail').prop('hidden',true).attr('hidden','hidden').hide();
+    if(opening){
+      $(this).attr('aria-expanded','true').addClass('is-active');
+      $detail.prop('hidden',false).removeAttr('hidden').show();
+    }
+  });
+
+
+  function hrimSyncInProgressMobileColspan(){
+    var mobile=window.matchMedia && window.matchMedia('(max-width:760px)').matches;
+    $('.hrim-in-progress-detail-cell').each(function(){
+      this.colSpan=mobile?3:9;
+    });
+  }
+  $(hrimSyncInProgressMobileColspan);
+  $(window).on('load resize orientationchange',hrimSyncInProgressMobileColspan);
+  $(document).on('hrim:content-updated',hrimSyncInProgressMobileColspan);
+
   $(document).on('click','.hrim-print-inspection',function(){document.body.classList.add('hrim-printing-inspection');window.print();setTimeout(function(){document.body.classList.remove('hrim-printing-inspection');},300);});
 
   $(document).on('click','.hrim-direct-inspection-pdf',function(){
@@ -644,6 +843,9 @@
     var $btn=$(this),target=String($btn.attr('data-table')||''),$table=target?$('#'+target):$();
     if(!$table.length){var $scope=$btn.closest('.hrim-panel');$table=$scope.find('table.hrim-exportable').first();}
     if(!$table.length){$table=$btn.closest('.hrim-content').find('table.hrim-exportable').first();}
+    // Robust fallback for master views where exportable class may be added after page initialization.
+    if(!$table.length){$table=$btn.closest('.hrim-panel').find('table.hrim-table').first();}
+    if(!$table.length){$table=$btn.closest('.hrim-content').find('table.hrim-table').first();}
     if(!$table.length)return;
     var $panel=$table.closest('.hrim-panel'),q=String($panel.find('.hrim-table-search').val()||'').toLowerCase(),rows=[];
     $table.find('tr').each(function(){
@@ -681,17 +883,61 @@
         }else{$existing.attr('data-table',tableId);}
       }
       var $heads=$table.children('thead').find('th');
-      $heads.each(function(i){if(i<$heads.length-1&&!$(this).text().toLowerCase().includes('action'))$(this).addClass('hrim-sortable').attr('data-col',i);});
-      $table.after('<div class="hrim-table-meta"><div class="hrim-row-count"></div><div class="hrim-pagination"></div></div>');
+      $heads.each(function(i){var label=$(this).text().toLowerCase();if(!label.includes('action')&&!$(this).hasClass('hrim-no-export'))$(this).addClass('hrim-sortable').attr('data-col',i);});
+      var $meta=$('<div class="hrim-table-meta"><div class="hrim-table-meta-left"><div class="hrim-row-count"></div></div><div class="hrim-pagination"></div></div>');
+      var $scoreWrap=$table.closest('.hrim-score-desktop-table');
+      if($scoreWrap.length){$panel.append($meta);}else{$table.after($meta);}
       refreshTable($panel);
     });
+  }
+  function hrimHidePaginated($elements){
+    $elements.each(function(){
+      this.classList.add('hrim-pagination-hidden');
+      this.style.setProperty('display','none','important');
+      this.setAttribute('aria-hidden','true');
+    });
+  }
+  function hrimShowPaginated($elements){
+    $elements.each(function(){
+      this.classList.remove('hrim-pagination-hidden');
+      this.style.removeProperty('display');
+      this.removeAttribute('aria-hidden');
+    });
+  }
+  function hrimScrollPaginationToTop($panel){
+    var target=$panel.find('.hrim-panel-head,.hrim-table-wrap,.hrim-score-mobile-list').filter(':visible').first()[0]||$panel[0];
+    if(target&&typeof target.scrollIntoView==='function'){target.scrollIntoView({behavior:'auto',block:'start'});}
+  }
+  function hrimRenderPager($pager,page,pages){
+    $pager.empty();
+    if(!pages || pages<=1) return;
+    $pager.append('<button type="button" class="hrim-page-nav hrim-page-prev" style="background:transparent!important;background-color:transparent!important;color:#94a3b8!important;border:0!important;box-shadow:none!important;" data-page="'+(page-1)+'" '+(page<=1?'disabled aria-disabled="true"':'')+' aria-label="Previous page">&#8249;</button>');
+    var items=[];
+    if(pages<=7){
+      for(var i=1;i<=pages;i++) items.push(i);
+    }else{
+      items=[1];
+      var start=Math.max(2,page-1), end=Math.min(pages-1,page+1);
+      if(start>2) items.push('ellipsis');
+      for(var j=start;j<=end;j++) items.push(j);
+      if(end<pages-1) items.push('ellipsis');
+      items.push(pages);
+    }
+    items.forEach(function(item,idx){
+      if(item==='ellipsis'){
+        if(idx===0 || items[idx-1]!=='ellipsis') $pager.append('<span class="hrim-page-ellipsis" aria-hidden="true">...</span>');
+      }else{
+        $pager.append('<button type="button" class="'+(item===page?'current':'')+'" style="background:transparent!important;background-color:transparent!important;border:0!important;box-shadow:none!important;color:'+(item===page?'var(--hrim-accent)':'#64748b')+'!important;font-weight:'+(item===page?'800':'700')+'!important;" data-page="'+item+'" '+(item===page?'disabled aria-disabled="true" aria-current="page"':'')+'>'+item+'</button>');
+      }
+    });
+    $pager.append('<button type="button" class="hrim-page-nav hrim-page-next" style="background:transparent!important;background-color:transparent!important;color:#94a3b8!important;border:0!important;box-shadow:none!important;" data-page="'+(page+1)+'" '+(page>=pages?'disabled aria-disabled="true"':'')+' aria-label="Next page">&#8250;</button>');
   }
   function refreshTable($panel){
     var $table=$panel.find('table.hrim-table').first();if(!$table.length)return;
     var q=String($panel.find('.hrim-table-search').val()||'').toLowerCase();
     if($table.hasClass('hrim-sectionwise-table')){
       var $rows=$table.children('tbody').children('tr'),items=[];
-      $rows.hide();
+      hrimHidePaginated($rows);
       $rows.filter('.hrim-section-heading-row').each(function(){
         var $heading=$(this),$children=$heading.nextUntil('.hrim-section-heading-row','.hrim-section-checkpoint-row');
         var sectionText=String($heading.text()||'').toLowerCase();
@@ -700,24 +946,22 @@
         if(sectionMatch){$matched=$children;}
         $matched.each(function(){items.push({heading:$heading[0],row:this});});
       });
-      var sectionSize=parseInt($panel.data('hrim-size')||20,10),sectionPages=Math.max(1,Math.ceil(items.length/sectionSize)),sectionPage=Math.min(parseInt($panel.data('hrim-page')||1,10),sectionPages);
+      var sectionSizeValue=$panel.data('hrim-size')||20,sectionSize=(sectionSizeValue==='all'||parseInt(sectionSizeValue,10)===0)?Math.max(items.length,1):parseInt(sectionSizeValue,10),sectionPages=Math.max(1,Math.ceil(items.length/sectionSize)),sectionPage=Math.min(parseInt($panel.data('hrim-page')||1,10),sectionPages);
       $panel.data('hrim-page',sectionPage);
       var visibleHeadings=[];
       items.slice((sectionPage-1)*sectionSize,sectionPage*sectionSize).forEach(function(item){
-        if(visibleHeadings.indexOf(item.heading)===-1){$(item.heading).show();visibleHeadings.push(item.heading);}
-        $(item.row).show();
+        if(visibleHeadings.indexOf(item.heading)===-1){hrimShowPaginated($(item.heading));visibleHeadings.push(item.heading);}
+        hrimShowPaginated($(item.row));
       });
       $panel.find('.hrim-row-count').html('<strong>'+items.length+'</strong> record'+(items.length===1?'':'s'));
       var $sectionPager=$panel.find('.hrim-pagination').empty();
-      if(items.length>sectionSize){
-        $sectionPager.append('<button data-page="'+(sectionPage-1)+'" '+(sectionPage<=1?'disabled':'')+'>Previous</button>');
-        for(var sp=1;sp<=sectionPages;sp++){if(sectionPages>7&&Math.abs(sp-sectionPage)>2&&sp!==1&&sp!==sectionPages)continue;$sectionPager.append('<button class="'+(sp===sectionPage?'current':'')+'" data-page="'+sp+'">'+sp+'</button>');}
-        $sectionPager.append('<button data-page="'+(sectionPage+1)+'" '+(sectionPage>=sectionPages?'disabled':'')+'>Next</button>');
+      if($panel.data('hrim-size')!=='all'&&items.length>sectionSize){
+        hrimRenderPager($sectionPager,sectionPage,sectionPages);
       }
       return;
     }
     var $tbody=$table.children('tbody');
-    var rows=$tbody.children('tr').filter(function(){return !$(this).find('.hrim-empty').length;}).get();
+    var rows=$tbody.children('tr').filter(function(){return !$(this).find('.hrim-empty').length && !$(this).hasClass('hrim-issue-history-detail-row') && !$(this).hasClass('hrim-supervision-detail-row');}).get();
     var sortCol=$panel.data('hrim-sort-col'),sortDir=$panel.data('hrim-sort-dir')||'asc';
     if(sortCol!==undefined){rows.sort(function(a,b){var av=$(a).children().eq(sortCol).text().trim(),bv=$(b).children().eq(sortCol).text().trim();var an=parseFloat(av),bn=parseFloat(bv);var cmp=(!isNaN(an)&&!isNaN(bn))?an-bn:av.localeCompare(bv,undefined,{numeric:true,sensitivity:'base'});return sortDir==='asc'?cmp:-cmp;});$.each(rows,function(_,r){$tbody.append(r);});}
     var matched=rows.filter(function(r){
@@ -726,15 +970,24 @@
       return searchMatch&&filterMatch;
     });
     var noPagination=$panel.hasClass('hrim-no-pagination');
-    var size=noPagination?Math.max(matched.length,1):parseInt($panel.data('hrim-size')||20,10),pages=Math.max(1,Math.ceil(matched.length/size)),page=noPagination?1:Math.min(parseInt($panel.data('hrim-page')||1,10),pages);$panel.data('hrim-page',page);
-    $(rows).hide();matched.slice((page-1)*size,page*size).forEach(function(r){$(r).show();});
+    var sizeValue=$panel.data('hrim-size')||20,size=noPagination?Math.max(matched.length,1):((sizeValue==='all'||parseInt(sizeValue,10)===0)?Math.max(matched.length,1):parseInt(sizeValue,10)),pages=Math.max(1,Math.ceil(matched.length/size)),page=noPagination?1:Math.min(parseInt($panel.data('hrim-page')||1,10),pages);$panel.data('hrim-page',page);
+    hrimHidePaginated($(rows));matched.slice((page-1)*size,page*size).forEach(function(r){hrimShowPaginated($(r));});
+    var $scoreCards=$panel.find('.hrim-score-mobile-card');
+    if($scoreCards.length){
+      var scoreMatched=$scoreCards.filter(function(){var text=String($(this).attr('data-search')||$(this).text()||'').toLowerCase();return !q||text.indexOf(q)>-1;}).get();
+      hrimHidePaginated($scoreCards);
+      scoreMatched.slice((page-1)*size,page*size).forEach(function(card){hrimShowPaginated($(card));});
+    }
     $panel.find('.hrim-row-count').html('<strong>'+matched.length+'</strong> record'+(matched.length===1?'':'s'));
-    var $pager=$panel.find('.hrim-pagination').empty();if(!noPagination&&matched.length>size){$pager.append('<button data-page="'+(page-1)+'" '+(page<=1?'disabled':'')+'>Previous</button>');for(var i=1;i<=pages;i++){if(pages>7&&Math.abs(i-page)>2&&i!==1&&i!==pages)continue;$pager.append('<button class="'+(i===page?'current':'')+'" data-page="'+i+'">'+i+'</button>');}$pager.append('<button data-page="'+(page+1)+'" '+(page>=pages?'disabled':'')+'>Next</button>');}
+    var $pager=$panel.find('.hrim-pagination').empty();if(!noPagination&&sizeValue!=='all'&&matched.length>size){hrimRenderPager($pager,page,pages);}
   }
   window.hrimRefreshTable=refreshTable;
-  $(document).on('click','.hrim-pagination button:not(:disabled)',function(){var $p=$(this).closest('.hrim-panel');$p.data('hrim-page',parseInt($(this).data('page'),10));refreshTable($p);});
+  $(document).on('click','.hrim-pagination button',function(e){e.preventDefault();e.stopImmediatePropagation();var $button=$(this);if($button.prop('disabled')||$button.attr('aria-disabled')==='true'||$button.hasClass('current'))return false;var $p=$button.closest('.hrim-panel');if(!$p.length){$p=$button.closest('.hrim-content').find('.hrim-panel').first();}var targetPage=parseInt($button.attr('data-page'),10);if(!$p.length||!Number.isFinite(targetPage)||targetPage<1)return false;$p.data('hrim-page',targetPage);refreshTable($p);hrimScrollPaginationToTop($p);return false;});
+  function applyTypedPageSize(el){var $input=$(el),$p=$input.closest('.hrim-panel'),raw=String($input.val()||'20').trim().toLowerCase();if(raw==='all'||raw==='0'){ $p.data('hrim-size','all').data('hrim-page',1); refreshTable($p); return; } var value=parseInt(raw,10); if(!isFinite(value)||value<1)value=20; value=Math.max(1,Math.floor(value)); $input.val(String(value)); $p.data('hrim-size',value).data('hrim-page',1); refreshTable($p);}
+  $(document).on('change','.hrim-page-size',function(){applyTypedPageSize(this);});
   $(document).on('click','.hrim-sortable',function(){var $p=$(this).closest('.hrim-panel'),col=parseInt($(this).data('col'),10),old=$p.data('hrim-sort-col'),dir=(old===col&&$p.data('hrim-sort-dir')==='asc')?'desc':'asc';$p.data('hrim-sort-col',col).data('hrim-sort-dir',dir).data('hrim-page',1);$(this).siblings().removeClass('asc desc');$(this).removeClass('asc desc').addClass(dir);refreshTable($p);});
   initTables();
+  $('.hrim-table-wrap').each(function(){ this.scrollLeft=0; });
   // Link any remaining filter-level Excel buttons to the corresponding main table.
   $('.hrim-content').each(function(){
     var $content=$(this),$tables=$content.find('table.hrim-exportable').filter(function(){return !$(this).closest('.hrim-modal,.hrim-inspection-detail').length;});
@@ -885,12 +1138,20 @@
     var h=String($('#hrimIssueHotel').val()||''),f=String($('#hrimIssueFloor').val()||'');
     hrimSetLinkedOptionVisibility($('#hrimIssueFloor'),function($option){return !h||String($option.data('hotel')||'')===h;});
     f=String($('#hrimIssueFloor').val()||'');
-    hrimSetLinkedOptionVisibility($('#hrimIssueRoom'),function($option){
+    var $room=$('#hrimIssueRoom');
+    hrimSetLinkedOptionVisibility($room,function($option){
+      // Do not expose any Asset until a Floor has actually been selected.
+      if(!f) return false;
       var hotelOk=!h||String($option.data('hotel')||'')===h;
-      var floorOk=!f||String($option.data('floor')||'')===f;
+      var floorOk=String($option.data('floor')||'')===f;
       return hotelOk&&floorOk;
     });
-    if(source==='hotel'&&!$('#hrimIssueFloor').val())$('#hrimIssueRoom').val('');
+    // Asset must remain unavailable until a Floor is selected.
+    var hasFloor=!!f;
+    $room.prop('disabled',!hasFloor).attr('aria-disabled',hasFloor?'false':'true');
+    if(!hasFloor)$room.val('');
+    $room.trigger('hrim-linked-refresh').trigger('change.select2');
+    if(source==='hotel'&&!$('#hrimIssueFloor').val())$room.val('');
   }
   $(document).on('change','#hrimIssueHotel',function(){hrimFilterIssueLocation('hotel');});
   $(document).on('change','#hrimIssueFloor',function(){hrimFilterIssueLocation('floor');});
@@ -906,8 +1167,9 @@
 
       var targetId='hrimFilterPanel'+index;
       var storageKey='hrim_filter_open:'+window.location.pathname+':'+index;
+      /* v3.17.64: filters must always start collapsed on every view load. */
       var savedOpen=false;
-      try { savedOpen=sessionStorage.getItem(storageKey)==='1'; } catch(e) {}
+      try { sessionStorage.removeItem(storageKey); } catch(e) {}
 
       $panel.data('hrim-filter-enhanced',1)
         .addClass('hrim-collapsible-filter-panel')
@@ -971,7 +1233,8 @@
         .attr('aria-expanded',open?'true':'false')
         .attr('title',open?'Hide Filters':'Show Filters')
         .attr('aria-label',open?'Hide Filters':'Show Filters');
-      try { sessionStorage.setItem($panel.data('hrim-filter-storage-key'),open?'1':'0'); } catch(e) {}
+      /* Do not remember the open state; filters start closed on the next view load. */
+      try { sessionStorage.removeItem($panel.data('hrim-filter-storage-key')); } catch(e) {}
     });
   });
 
@@ -1035,17 +1298,12 @@
       if(sectionValue&&!sectionValid)$section.val('');
       $section.trigger('hrim-linked-refresh');
     }
-    var $assigned=$('#hrimAddIssueForm select[name=assigned_to]'),assignedValue=String($assigned.val()||''),assignedValid=false;
-    $assigned.find('option').each(function(){
-      if(!this.value){$(this).prop('hidden',false).prop('disabled',false);return;}
-      var global=String($(this).data('global')||'')==='1';
-      var departments=String($(this).data('departments')||'').split(',').filter(Boolean);
-      var show=global||!department||departments.indexOf(department)>-1;
-      $(this).prop('hidden',!show).prop('disabled',!show);
-      if(show&&String(this.value)===assignedValue)assignedValid=true;
-    });
-    if(assignedValue&&!assignedValid)$assigned.val('');
-    $assigned.trigger('hrim-linked-refresh');
+    // v3.19.31: Assign To is read-only and always follows the selected Department Head.
+    var $deptOption=$('#hrimIssueDepartment option:selected');
+    var headId=department?String($deptOption.data('head-id')||''):'';
+    var headName=department?String($deptOption.data('head-name')||''):'';
+    $('#hrimIssueAssignedTo').val(headId);
+    $('#hrimIssueAssignedHead').val(!department?'Select Department first':(headName||'Department Head not set'));
   }
   $(document).on('change','#hrimIssueDepartment',hrimFilterIssueDepartment);
   hrimFilterIssueDepartment();
@@ -1098,6 +1356,15 @@
     });
     $root.find('.hrim-search-select-options').html(html);
     $root.find('.hrim-search-select-value').text(selectedText($select));
+    // Keep the custom searchable UI in sync with the native select disabled state.
+    var selectDisabled=!!$select.prop('disabled');
+    $root.toggleClass('is-disabled',selectDisabled);
+    $root.find('.hrim-search-select-toggle').prop('disabled',selectDisabled).attr('aria-disabled',selectDisabled?'true':'false');
+    if(selectDisabled){
+      $root.removeClass('is-open');
+      $root.find('.hrim-search-select-panel').prop('hidden',true);
+      $root.find('.hrim-search-select-toggle').attr('aria-expanded','false');
+    }
   }
 
   $(document).on('hrim-linked-refresh','select',function(){
@@ -1147,6 +1414,8 @@
   $(document).on('click','.hrim-search-select-toggle',function(e){
     e.preventDefault(); e.stopPropagation();
     var $root=$(this).closest('.hrim-search-select');
+    var $select=$root.prev('select.hrim-native-search-select');
+    if($select.prop('disabled') || $root.hasClass('is-disabled')) return;
     var open=!$root.hasClass('is-open');
     closeAll(open?$root[0]:null);
     $root.toggleClass('is-open',open);
@@ -1162,7 +1431,10 @@
     var query=$(this).val().toLowerCase().trim();
     $(this).closest('.hrim-search-select-panel').find('.hrim-search-select-option').each(function(){
       var text=$(this).text().toLowerCase();
-      $(this).toggle(!query || text.indexOf(query)!==-1);
+      /* Use a CSS class instead of jQuery .toggle(). Several RoomScore mobile
+         dropdown rules intentionally use display:flex!important, which otherwise
+         prevents non-matching options from being hidden. */
+      $(this).toggleClass('hrim-search-option-filtered-out', !!query && text.indexOf(query)===-1);
     });
   });
 
@@ -1225,6 +1497,22 @@
     setTimeout(function(){ $n.addClass('is-show'); },20);
     setTimeout(function(){ $n.removeClass('is-show'); setTimeout(function(){$n.remove();},250); },2500);
   }
+  function hrimPaintOccupancyStatus($group){
+    if(!$group || !$group.length) return;
+    var current=String($group.attr('data-current-status') || $group.find('.hrim-occ-status-btn.is-selected').data('status') || '').toLowerCase();
+    var $yes=$group.find('.hrim-occ-status-btn.yes');
+    var $no=$group.find('.hrim-occ-status-btn.no');
+    $yes[0] && $yes[0].style.setProperty('background-color', current==='yes' ? '#16a34a' : '#ffffff', 'important');
+    $yes[0] && $yes[0].style.setProperty('color', current==='yes' ? '#ffffff' : '#16a34a', 'important');
+    $yes[0] && $yes[0].style.setProperty('border-color', current==='yes' ? '#15803d' : '#16a34a', 'important');
+    $yes[0] && $yes[0].style.setProperty('opacity','1','important');
+    $no[0] && $no[0].style.setProperty('background-color', current==='no' ? '#dc2626' : '#ffffff', 'important');
+    $no[0] && $no[0].style.setProperty('color', current==='no' ? '#ffffff' : '#dc2626', 'important');
+    $no[0] && $no[0].style.setProperty('border-color', current==='no' ? '#b91c1c' : '#dc2626', 'important');
+    $no[0] && $no[0].style.setProperty('opacity','1','important');
+  }
+  $('.hrim-occ-status-buttons').each(function(){ hrimPaintOccupancyStatus($(this)); });
+
   $(document).on('click','.hrim-occ-status-btn',function(){
     var $button=$(this), $group=$button.closest('.hrim-occ-status-buttons'), $row=$button.closest('tr');
     if($button.prop('disabled') || $group.hasClass('is-saving') || $group.hasClass('is-locked')) return;
@@ -1249,6 +1537,8 @@
         }
         $group.find('.hrim-occ-status-btn').removeClass('is-selected');
         $button.addClass('is-selected');
+        $group.attr('data-current-status',status);
+        hrimPaintOccupancyStatus($group);
         $row.find('.hrim-occ-time').text(res.data.time);
         $row.find('.hrim-occ-user').text(res.data.user);
 
@@ -1281,6 +1571,8 @@
         $group.find('.hrim-occ-status-btn').prop('disabled',false);
         $group.find('.hrim-occ-status-btn').removeClass('is-selected');
         if(previous) $group.find('[data-status="'+previous+'"]').addClass('is-selected');
+        $group.attr('data-current-status',previous);
+        hrimPaintOccupancyStatus($group);
       })
       .always(function(){ $group.removeClass('is-saving'); spinner(false); });
   });
@@ -1303,14 +1595,112 @@
   });
 })(jQuery);
 
-/* Add Occupancy floor room popup */
+/* System Occupancy: direct floor-wise input with auto-save and 5-minute lock. */
 (function($){
+  var floorSaveTimers={};
+  var floorLockTimers={};
+
+  function lockFloorInput($input){
+    if(!$input || !$input.length) return;
+    $input.prop('disabled',true).addClass('is-locked');
+    $input.closest('.hrim-system-floor-row').addClass('is-locked');
+    $input.siblings('.hrim-system-floor-save-state').text('Locked');
+  }
+
+  function scheduleFloorLock($input,editableUntil){
+    var key=String($input.data('session-id'))+'-'+String($input.data('floor-id'));
+    if(floorLockTimers[key]) clearTimeout(floorLockTimers[key]);
+    var until=parseInt(editableUntil||0,10);
+    if(!until) return;
+    var delay=(until*1000)-Date.now();
+    if(delay<=0){ lockFloorInput($input); return; }
+    floorLockTimers[key]=setTimeout(function(){ lockFloorInput($input); },delay);
+  }
+
   $(document).on('click','.hrim-open-office-count-modal',function(){
     var $btn=$(this),$modal=$('#hrimOfficeCountModal');
-    $('#hrimOfficeSessionId').val($btn.data('session-id'));
-    $('#hrimOfficeDate').val($btn.data('date'));
-    $('#hrimOfficeCount').val($btn.attr('data-count')||'').trigger('focus');
+    var floors=[];
+    try{ floors=JSON.parse($btn.attr('data-floors')||'[]'); }catch(e){ floors=[]; }
+    var sessionId=$btn.data('session-id');
+    $('#hrimOfficeDateText').text($btn.data('date')||'');
+    $('#hrimOfficeFloorButtons').empty();
+
+    floors.forEach(function(floor){
+      var count=(floor.count===null || typeof floor.count==='undefined') ? '' : String(floor.count);
+      var $row=$('<div class="hrim-system-floor-row"></div>');
+      var $name=$('<div class="hrim-system-floor-name"></div>').text(floor.name);
+      var $fieldWrap=$('<div class="hrim-system-floor-field-wrap"></div>');
+      var $input=$('<input type="number" min="0" step="1" inputmode="numeric" class="hrim-system-floor-input">')
+        .val(count)
+        .attr('data-session-id',sessionId)
+        .attr('data-floor-id',floor.id)
+        .prop('disabled',!!floor.locked);
+      var $state=$('<span class="hrim-system-floor-save-state"></span>').text(floor.updated_at || (floor.locked?'Locked':''));
+      if(floor.locked){
+        $input.addClass('is-locked');
+        $row.addClass('is-locked');
+      }
+      $fieldWrap.append($input,$state);
+      $row.append($name,$fieldWrap);
+      $('#hrimOfficeFloorButtons').append($row);
+      if(!floor.locked && floor.editable_until) scheduleFloorLock($input,floor.editable_until);
+    });
+    if(!floors.length){
+      $('#hrimOfficeFloorButtons').html('<div class="hrim-empty">No floors are available.</div>');
+    }
     $modal.addClass('open').attr('aria-hidden','false');
+  });
+
+  $(document).on('input change','.hrim-system-floor-input',function(){
+    var $input=$(this);
+    if($input.prop('disabled')) return;
+    var value=$input.val();
+    var key=String($input.data('session-id'))+'-'+String($input.data('floor-id'));
+    if(floorSaveTimers[key]) clearTimeout(floorSaveTimers[key]);
+    $input.siblings('.hrim-system-floor-save-state').text(value===''?'':'Saving…');
+    if(value==='') return;
+    floorSaveTimers[key]=setTimeout(function(){
+      if($input.prop('disabled')) return;
+      $.post(HRIM.ajax,{
+        action:'hrim_save_floor_system_count',
+        nonce:HRIM.nonce,
+        session_id:$input.data('session-id'),
+        floor_id:$input.data('floor-id'),
+        system_count:$input.val()
+      }).done(function(res){
+        if(!res || !res.success){
+          var msg=res&&res.data&&res.data.message?res.data.message:'Unable to save.';
+          $input.siblings('.hrim-system-floor-save-state').text('Not saved');
+          if(res&&res.data&&res.data.locked) lockFloorInput($input);
+          notice(msg,'error');
+          return;
+        }
+        $input.siblings('.hrim-system-floor-save-state').text(res.data.updated_at || 'Saved');
+        scheduleFloorLock($input,res.data.editable_until);
+        var sessionId=String($input.data('session-id'));
+        var $tableRow=$('.hrim-office-count-table tbody tr[data-session-id="'+sessionId+'"]');
+        if($tableRow.length){
+          $tableRow.find('td[data-label="System Count"]').text(res.data.total !== null && res.data.total !== undefined ? res.data.total : '—');
+          if(res.data.complete){
+            var sessionIdAttr=String($input.data('session-id'));
+            var dateAttr='';
+            var floorsAttr='[]';
+            var $existingBtn=$tableRow.find('.hrim-open-office-count-modal').first();
+            if($existingBtn.length){
+              dateAttr=$existingBtn.attr('data-date') || '';
+              floorsAttr=$existingBtn.attr('data-floors') || '[]';
+            }
+            var lockedHtml='<button type="button" class="hrim-action edit hrim-open-office-count-modal hrim-office-count-edit-btn is-locked" data-session-id="'+sessionIdAttr+'" data-date="'+dateAttr+'" data-floors="'+floorsAttr.replace(/"/g,'&quot;')+'" data-locked="1" title="Locked" aria-label="Locked"><span class="dashicons dashicons-edit"></span><span class="hrim-office-count-lock-badge" aria-hidden="true"><span class="dashicons dashicons-lock"></span></span></button>';
+            $tableRow.find('td[data-label="Action"]').html(lockedHtml);
+          }
+        }
+      }).fail(function(xhr){
+        var locked=xhr&&xhr.responseJSON&&xhr.responseJSON.data&&xhr.responseJSON.data.locked;
+        $input.siblings('.hrim-system-floor-save-state').text(locked?'Locked':'Not saved');
+        if(locked) lockFloorInput($input);
+        notice('Unable to save System Count.','error');
+      });
+    },650);
   });
 
   $(document).on('click','.hrim-view-floor-rooms',function(){
@@ -1319,7 +1709,7 @@
     var $modal=$('#hrimOccupancyRoomsModal');
     $modal.find('.hrim-occ-floor-room-panel').prop('hidden',true);
     $modal.find('[data-floor-panel="'+floorId+'"]').prop('hidden',false);
-    $modal.find('.hrim-occ-modal-title').text(floorName+' - Rooms');
+    $modal.find('.hrim-occ-modal-title').text(floorName);
     $modal.addClass('open').attr('aria-hidden','false');
   });
   $(document).on('click','#hrimOccupancyRoomsModal .hrim-modal-close',function(){
@@ -1640,7 +2030,7 @@ jQuery(function($){
       if(!p || /^(SCRIPT|STYLE|TEXTAREA|OPTION)$/i.test(p.nodeName)) return NodeFilter.FILTER_REJECT;
       // Never rewrite record values displayed in tables or select options.
       // Example: an Asset Type entered as 'Room' must continue to display as 'Room'.
-      if($(p).closest('td, option').length) return NodeFilter.FILTER_REJECT;
+      if($(p).closest('td, option, .hrim-score-mobile-card header strong, .hrim-search-select-option, .hrim-search-select-value').length) return NodeFilter.FILTER_REJECT;
       return /\brooms?\b/i.test(node.nodeValue||'') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }});
     var nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
@@ -1727,4 +2117,751 @@ jQuery(function($){
   $(document).ready(hrimFixCheckpointMobileGrid);
   $(document).on('click change ajaxComplete',function(){setTimeout(hrimFixCheckpointMobileGrid,30);});
   window.addEventListener('resize',hrimFixCheckpointMobileGrid);
+})(jQuery);
+
+/* v3.16.35: filter the true mobile office/occupancy cards with the same search box */
+jQuery(function($){
+  $(document).on('input','.hrim-record-card-panel .hrim-table-search',function(){
+    var q=String($(this).val()||'').toLowerCase();
+    $(this).closest('.hrim-record-card-panel').find('.hrim-record-mobile-card').each(function(){
+      $(this).toggle(!q || String($(this).text()||'').toLowerCase().indexOf(q)!==-1);
+    });
+  });
+});
+
+/* v3.16.37: true mobile cards for every Master list except Users */
+(function($){
+  function cleanText(value){ return String(value == null ? '' : value).replace(/\s+/g,' ').trim(); }
+
+  function buildMasterMobileCards(){
+    if(/hotel-inspection-users\/?$/i.test(window.location.pathname)) return;
+
+    $('.hrim-master-panel').each(function(panelIndex){
+      var $panel=$(this);
+      if($panel.hasClass('hrim-users-panel') || $panel.find('.hrim-users-table').length) return;
+      if($panel.children('.hrim-master-mobile-list').length) return;
+
+      var $table=$panel.find('> .hrim-table-wrap > table.hrim-table').first();
+      if(!$table.length) $table=$panel.find('.hrim-table-wrap > table.hrim-table').first();
+      if(!$table.length || $table.hasClass('hrim-applicable-checkpoints-table')) return;
+
+      var headers=[];
+      $table.find('thead th').each(function(){ headers.push(cleanText($(this).text())); });
+      if(!headers.length) return;
+
+      var $list=$('<div class="hrim-master-mobile-list" aria-label="Mobile card view"></div>');
+      var recordCount=0;
+
+      $table.find('tbody > tr').each(function(){
+        var $row=$(this);
+        var $cells=$row.children('td');
+        if(!$cells.length) return;
+        if($cells.length===1 && ($cells.first().attr('colspan') || $cells.first().hasClass('hrim-empty'))){
+          $list.append($('<div class="hrim-master-mobile-empty"></div>').text(cleanText($cells.first().text()) || 'No records found.'));
+          return;
+        }
+
+        recordCount++;
+        var titleIndex=1;
+        for(var i=0;i<headers.length;i++){
+          var h=(headers[i]||'').toLowerCase();
+          if(h && !/^(sl\.?|s\.?no\.?|serial|actions?)$/.test(h)){ titleIndex=i; break; }
+        }
+        var title=cleanText($cells.eq(titleIndex).text()) || ('Record '+recordCount);
+        var titleLabel=headers[titleIndex] || 'Record';
+        var $card=$('<article class="hrim-master-mobile-card"></article>');
+        var $header=$('<header><span></span><strong></strong></header>');
+        $header.find('span').text(titleLabel);
+        $header.find('strong').text(title);
+        $card.append($header);
+
+        $cells.each(function(index){
+          var label=headers[index] || '';
+          var key=label.toLowerCase();
+          if(index===titleIndex || /^(sl\.?|s\.?no\.?|serial)$/.test(key)) return;
+          var $cell=$(this);
+          var $rowItem=$('<div class="hrim-master-mobile-row"></div>');
+          if(/actions?/.test(key) || $cell.find('a,button,form').length){
+            $rowItem.addClass('hrim-master-mobile-actions');
+          }
+          $rowItem.append($('<span></span>').text(label || 'Details'));
+          var $value=$('<div class="hrim-master-mobile-value"></div>');
+          $value.append($cell.contents().clone(true,true));
+          if(!cleanText($value.text()) && !$value.find('a,button,input,select').length) $value.text('—');
+          $rowItem.append($value);
+          $card.append($rowItem);
+        });
+        $list.append($card);
+      });
+
+      $table.closest('.hrim-table-wrap').addClass('hrim-master-desktop-table');
+      $panel.append($list);
+      $panel.addClass('hrim-master-card-enabled');
+    });
+  }
+
+  $(buildMasterMobileCards);
+  $(document).on('input','.hrim-master-card-enabled .hrim-table-search',function(){
+    var q=cleanText($(this).val()).toLowerCase();
+    $(this).closest('.hrim-master-card-enabled').find('.hrim-master-mobile-card').each(function(){
+      $(this).toggle(!q || cleanText($(this).text()).toLowerCase().indexOf(q)!==-1);
+    });
+  });
+})(jQuery);
+
+
+/* v3.16.42: proper mobile cards for Pending Assign Issues, Pending Issues and Resolved Issues */
+(function($){
+  function cleanText(value){ return String(value == null ? '' : value).replace(/\s+/g,' ').trim(); }
+  function normalise(value){ return cleanText(value).toLowerCase(); }
+  function issuePages(){ return false; /* v3.16.79: use table view on mobile for all issue pages */ }
+  function titleIndex(headers){
+    var preferred=['checkpoint','issue','room','asset','section','date'];
+    for(var p=0;p<preferred.length;p++){
+      for(var i=0;i<headers.length;i++){
+        var key=normalise(headers[i]);
+        if(key===preferred[p] || key.indexOf(preferred[p])!==-1) return i;
+      }
+    }
+    for(var j=0;j<headers.length;j++){
+      var k=normalise(headers[j]);
+      if(k && !/^(sl\.?|s\.?no\.?|serial|photo|update photo|actions?)$/.test(k)) return j;
+    }
+    return 1;
+  }
+  function buildIssueMobileCards(){
+    if(!issuePages()) return;
+    $('.hrim-panel').each(function(){
+      var $panel=$(this);
+      if($panel.hasClass('hrim-no-print') || $panel.hasClass('hrim-dashboard-panel')) return;
+      if($panel.children('.hrim-issue-mobile-list').length) return;
+      var $table=$panel.find('> .hrim-table-wrap > table.hrim-table').first();
+      if(!$table.length) return;
+      var headers=[];
+      $table.find('thead th').each(function(){ headers.push(cleanText($(this).text())); });
+      if(!headers.length) return;
+      var $wrap=$table.closest('.hrim-table-wrap');
+      var $list=$('<div class="hrim-issue-mobile-list" aria-label="Issue mobile card view"></div>');
+      var tIndex=titleIndex(headers), count=0;
+      $table.find('tbody > tr').each(function(){
+        var $row=$(this), $cells=$row.children('td');
+        if(!$cells.length) return;
+        if($cells.length===1 && ($cells.first().attr('colspan') || $cells.first().hasClass('hrim-empty'))){
+          $list.append($('<div class="hrim-issue-mobile-empty"></div>').text(cleanText($cells.first().text()) || 'No records found.'));
+          return;
+        }
+        count++;
+        var title=cleanText($cells.eq(tIndex).text()) || ('Issue '+count);
+        var titleLabel=headers[tIndex] || 'Issue';
+        var $card=$('<article class="hrim-issue-mobile-card"></article>').attr('data-search', cleanText($row.text()));
+        var $head=$('<header><span></span><strong></strong></header>');
+        $head.find('span').text(titleLabel);
+        $head.find('strong').text(title);
+        $card.append($head);
+
+        $cells.each(function(index){
+          var label=headers[index] || '';
+          var key=normalise(label);
+          if(index===tIndex || /^(sl\.?|s\.?no\.?|serial)$/.test(key)) return;
+          var $cell=$(this);
+          var $item=$('<div class="hrim-issue-mobile-row"></div>');
+          if(/actions?/.test(key)) $item.addClass('hrim-issue-mobile-actions');
+          if(/photo/.test(key)) $item.addClass('hrim-issue-mobile-photo');
+          $item.append($('<span></span>').text(label || 'Details'));
+          var $value=$('<div class="hrim-issue-mobile-value"></div>');
+          $value.append($cell.contents().clone(true,true));
+          if(!cleanText($value.text()) && !$value.find('a,button,input,select,form,img,svg').length) $value.text('—');
+          $item.append($value);
+          $card.append($item);
+        });
+        $list.append($card);
+      });
+      $wrap.addClass('hrim-issue-desktop-table');
+      $panel.append($list).addClass('hrim-issue-card-enabled');
+    });
+  }
+  $(buildIssueMobileCards);
+  $(document).on('input','.hrim-table-search',function(){
+    if(!issuePages()) return;
+    var q=cleanText($(this).val()).toLowerCase();
+    $('.hrim-issue-card-enabled .hrim-issue-mobile-card').each(function(){
+      var text=String($(this).attr('data-search') || $(this).text() || '').toLowerCase();
+      $(this).toggle(!q || text.indexOf(q)!==-1);
+    });
+    $('.hrim-issue-card-enabled .hrim-issue-mobile-empty').toggle(!q);
+  });
+})(jQuery);
+
+
+/* v3.16.43: proper mobile cards for periodic/inspection history views */
+(function($){
+  function hrimCleanText(value){ return String(value == null ? '' : value).replace(/\s+/g,' ').trim(); }
+  function hrimNormalise(value){ return hrimCleanText(value).toLowerCase(); }
+  function hrimCardPages(){
+    /* v3.16.94: Periodic Tasks must remain in table view on mobile; disable the legacy generic card renderer. */
+    return false;
+  }
+  function hrimCardTitleIndex(headers){
+    var preferred=['task','room','asset','floor','date'];
+    for(var p=0;p<preferred.length;p++){
+      for(var i=0;i<headers.length;i++){
+        var key=hrimNormalise(headers[i]);
+        if(key===preferred[p] || key.indexOf(preferred[p])!==-1) return i;
+      }
+    }
+    for(var j=0;j<headers.length;j++){
+      var k=hrimNormalise(headers[j]);
+      if(k && !/^(sl\.?|s\.?no\.?|serial|action|actions)$/.test(k)) return j;
+    }
+    return Math.min(1, Math.max(headers.length-1, 0));
+  }
+  function hrimBuildGenericMobileCards(){
+    if(!hrimCardPages()) return;
+    $('.hrim-panel').each(function(){
+      var $panel=$(this);
+      if($panel.hasClass('hrim-no-print') || $panel.hasClass('hrim-dashboard-panel') || $panel.closest('.hrim-modal').length) return;
+      if($panel.children('.hrim-generic-mobile-list').length) return;
+      var $table=$panel.find('> .hrim-table-wrap > table.hrim-table').first();
+      if(!$table.length) return;
+      var headers=[];
+      $table.find('thead th').each(function(){ headers.push(hrimCleanText($(this).text())); });
+      if(!headers.length) return;
+      var $list=$('<div class="hrim-generic-mobile-list" aria-label="Mobile card view"></div>');
+      var tIndex=hrimCardTitleIndex(headers);
+      var count=0;
+      $table.find('tbody > tr').each(function(){
+        var $row=$(this);
+        if($row.hasClass('hrim-in-progress-detail-row') || $row.hasClass('hrim-section-detail-row') || $row.closest('.hrim-modal').length) return;
+        var $cells=$row.children('td');
+        if(!$cells.length) return;
+        if($cells.length===1 && ($cells.first().attr('colspan') || $cells.first().hasClass('hrim-empty'))){
+          $list.append($('<div class="hrim-generic-mobile-empty"></div>').text(hrimCleanText($cells.first().text()) || 'No records found.'));
+          return;
+        }
+        count++;
+        var title=hrimCleanText($cells.eq(tIndex).text()) || ('Record ' + count);
+        var titleLabel=headers[tIndex] || 'Details';
+        var $card=$('<article class="hrim-generic-mobile-card"></article>').attr('data-search', hrimCleanText($row.text()));
+        var $head=$('<header><span></span><strong></strong></header>');
+        $head.find('span').text(titleLabel);
+        $head.find('strong').text(title);
+        $card.append($head);
+
+        $cells.each(function(index){
+          var label=headers[index] || '';
+          var key=hrimNormalise(label);
+          if(index===tIndex || /^(sl\.?|s\.?no\.?|serial)$/.test(key)) return;
+          var $cell=$(this);
+          var $item=$('<div class="hrim-generic-mobile-row"></div>');
+          if(/actions?/.test(key)) $item.addClass('hrim-generic-mobile-actions');
+          if(/photo/.test(key)) $item.addClass('hrim-generic-mobile-photo');
+          $item.append($('<span></span>').text(label || 'Details'));
+          var $value=$('<div class="hrim-generic-mobile-value"></div>');
+          $value.append($cell.contents().clone(true,true));
+          if(!hrimCleanText($value.text()) && !$value.find('a,button,input,select,form,img,svg').length){
+            $value.text('—');
+          }
+          $item.append($value);
+          $card.append($item);
+        });
+        $list.append($card);
+      });
+      $panel.addClass('hrim-generic-card-enabled');
+      $panel.append($list);
+    });
+  }
+  $(hrimBuildGenericMobileCards);
+  $(document).on('input','.hrim-table-search',function(){
+    if(!hrimCardPages()) return;
+    var q=hrimCleanText($(this).val()).toLowerCase();
+    $('.hrim-generic-card-enabled .hrim-generic-mobile-card').each(function(){
+      var text=String($(this).attr('data-search') || $(this).text() || '').toLowerCase();
+      $(this).toggle(!q || text.indexOf(q)!==-1);
+    });
+    $('.hrim-generic-card-enabled .hrim-generic-mobile-empty').toggle(!q);
+  });
+})(jQuery);
+
+
+/* v3.16.49: keep Room Score mobile Asset text exactly synchronized with desktop table */
+(function($){
+  function syncRoomScoreMobileLabels(){
+    var $table=$('.hrim-room-score-table').first();
+    var $cards=$('.hrim-score-mobile-list[aria-label="Room score cards"] .hrim-score-mobile-card');
+    if(!$table.length || !$cards.length) return;
+    $table.find('tbody > tr').each(function(index){
+      var value=$.trim($(this).children('td').eq(1).text().replace(/\s+/g,' '));
+      var $card=$cards.eq(index);
+      if(!$card.length) return;
+      $card.find('header span').first().text('');
+      if(value) $card.find('header strong').first().text(value);
+      $card.find('header').addClass('hrim-score-mobile-card-head');
+      $card.find('header strong').first().addClass('hrim-score-mobile-title');
+    });
+  }
+  $(syncRoomScoreMobileLabels);
+  $(document).on('ajaxComplete',function(){ setTimeout(syncRoomScoreMobileLabels,20); });
+})(jQuery);
+
+
+/* v3.16.51: preserve Room as the actual asset type in Room Score and inspection dropdown */
+(function($){
+  function fixRoomLabels(){
+    $('.hrim-score-mobile-list[aria-label="Room score cards"] .hrim-score-mobile-card header strong').each(function(){
+      var text=$.trim($(this).text());
+      if(/^Asset\s*-/i.test(text)) $(this).text(text.replace(/^Asset\s*-/i,'Room -'));
+    });
+    $('#hrimRoom option').each(function(){
+      var text=$(this).text();
+      if(/\(Asset\s*-/i.test(text)) $(this).text(text.replace(/\(Asset\s*-/ig,'(Room -'));
+    });
+  }
+  $(fixRoomLabels);
+  $(document).on('ajaxComplete change','#hrimHotel',function(){ setTimeout(fixRoomLabels,20); });
+  var observer=new MutationObserver(function(){ fixRoomLabels(); });
+  $(function(){
+    var node=document.querySelector('.hrim-score-mobile-list, #hrimRoom');
+    if(node) observer.observe(node,{childList:true,subtree:true,characterData:true});
+  });
+})(jQuery);
+
+
+/* v3.16.52: force legacy generic Asset labels to Room in Perform Inspection dropdown */
+(function($){
+  function normalizeRoomText(value){
+    return String(value||'').replace(/\((?:Asset|Assets)\s*-/gi,'(Room -').replace(/^\s*(?:Asset|Assets)\s*-/gi,'Room -');
+  }
+  function fixInspectionRoomLabels(){
+    var $select=$('#hrimRoom');
+    if(!$select.length) return;
+    $select.find('option').each(function(){ var oldText=$(this).text(), newText=normalizeRoomText(oldText); if(newText!==oldText) $(this).text(newText); });
+    var $root=$select.next('.hrim-search-select');
+    if($root.length){
+      $root.find('.hrim-search-select-option').each(function(){ var txt=$(this).text(), fixed=normalizeRoomText(txt); if(fixed!==txt) $(this).text(fixed); });
+      var $value=$root.find('.hrim-search-select-value'); if($value.length) $value.text(normalizeRoomText($value.text()));
+    }
+  }
+  $(fixInspectionRoomLabels);
+  $(document).ajaxComplete(function(){ setTimeout(fixInspectionRoomLabels,30); });
+  $(document).on('change hrim-linked-refresh','#hrimRoom',function(){ setTimeout(fixInspectionRoomLabels,0); });
+})(jQuery);
+
+
+/* v3.16.53: preserve the actual Asset Type text inside searchable inspection dropdown */
+(function($){
+  function refreshActualAssetTypeLabels(){
+    var $select=$('#hrimRoom');
+    if(!$select.length) return;
+    var labels={};
+    $select.find('option').each(function(){ labels[String($(this).val())]=$(this).text(); });
+    var $picker=$select.next('.hrim-search-select');
+    if(!$picker.length) return;
+    $picker.find('.hrim-search-select-option').each(function(){
+      var value=String($(this).attr('data-value')||$(this).data('value')||'');
+      if(value && labels[value]) $(this).text(labels[value]);
+    });
+    var current=String($select.val()||'');
+    if(current && labels[current]) $picker.find('.hrim-search-select-value').text(labels[current]);
+  }
+  $(refreshActualAssetTypeLabels);
+  $(document).ajaxComplete(function(){ setTimeout(refreshActualAssetTypeLabels,60); });
+  $(document).on('change hrim-linked-refresh','#hrimRoom',function(){ setTimeout(refreshActualAssetTypeLabels,10); });
+})(jQuery);
+
+
+/* v3.16.57: truly compact mobile action column in inspection table views */
+(function($){
+  function compactMobileActionColumn(){
+    if(!/hotel-inspection-(in-progress|schedule-tasks-in-progress|schedule-tasks-history|history)\/?$/i.test(window.location.pathname)) return;
+    $('.hrim-table').each(function(){
+      var $table=$(this);
+      var $head=$table.find('thead th').last();
+      if(!$head.length) return;
+      var label=$.trim($head.text()).toLowerCase();
+      if(label.indexOf('action')===-1 && !$head.hasClass('hrim-no-export')) return;
+      var $dataRows=$table.find('tbody tr').filter(function(){
+        var $cells=$(this).children('td');
+        if(!$cells.length) return false;
+        if($cells.length===1 && ($cells.first().hasClass('hrim-empty') || $cells.first().attr('colspan'))) return false;
+        return $cells.last().find('a,button,form').length>0;
+      });
+      if(!$dataRows.length){
+        $head.removeClass('hrim-compact-action-head').attr({'aria-label':'Actions','title':'Actions'}).text('Actions');
+        return;
+      }
+      $table.addClass('hrim-compact-mobile-action-table');
+      $head.addClass('hrim-compact-action-head').attr({'aria-label':'Actions','title':'Actions'}).text('Actions');
+      $dataRows.each(function(){
+        $(this).children('td').last().addClass('hrim-compact-action-cell');
+      });
+    });
+  }
+  $(compactMobileActionColumn);
+})(jQuery);
+
+
+/* v3.16.59: mark Inspection History page for plain mobile table layout */
+(function(){
+  if(/\/hotel-inspection-history\/?$/i.test(window.location.pathname)){
+    document.documentElement.classList.add('hrim-inspection-history-page');
+  }
+})();
+
+/* v3.16.64: force Inspection History mobile Search + Excel + Filter toolbar */
+(function($){
+  $(function(){
+    if(!/hotel-inspection-history\/?$/i.test(window.location.pathname)) return;
+      var $result=$('.hrim-content > .hrim-panel').not('.hrim-no-print').first();
+      var $filterPanel=$('.hrim-content > .hrim-panel.hrim-no-print').first();
+      if(!$result.length || !$filterPanel.length) return;
+
+      var $head=$result.children('.hrim-panel-head').first();
+      if(!$head.length){
+        $head=$('<div class="hrim-panel-head hrim-results-panel-head"><div><small></small></div></div>');
+        $result.prepend($head);
+      }
+      $head.addClass('hrim-results-panel-head');
+      var $actions=$head.children('.hrim-toolbar,.hrim-panel-head-actions').first();
+      if(!$actions.length){
+        $actions=$('<div class="hrim-toolbar hrim-panel-head-actions"></div>').appendTo($head);
+      }
+
+      var $bar=$('.hrim-filter-action-bar').first();
+      if(!$bar.length){
+        $bar=$('<div class="hrim-filter-action-bar hrim-no-print"></div>');
+      }
+      $bar.addClass('hrim-history-mobile-toolbar');
+
+      var $search=$bar.find('input.hrim-table-search,input.hrim-header-search').first();
+      if(!$search.length){
+        $search=$filterPanel.find('input.hrim-table-search').first();
+        if($search.length) $search.detach();
+      }
+      if(!$search.length){
+        $search=$('<input type="search" class="hrim-table-search hrim-header-search" aria-label="Search">');
+      }
+      $search.addClass('hrim-header-search').attr('placeholder','');
+
+      var $excel=$bar.find('.hrim-export-csv').first();
+      if(!$excel.length){
+        $excel=$filterPanel.find('.hrim-export-csv').first();
+        if($excel.length) $excel.detach();
+      }
+      if($excel.length){
+        $excel.addClass('hrim-icon-only-button').attr({'title':'Download Excel','aria-label':'Download Excel'}).html('<span class="dashicons dashicons-download" aria-hidden="true"></span>');
+      }
+
+      var $toggle=$bar.find('.hrim-filter-toggle').first();
+      if(!$toggle.length){
+        var targetId=$filterPanel.attr('id') || 'hrimInspectionHistoryFilters';
+        $filterPanel.attr('id',targetId);
+        $toggle=$('<button type="button" class="hrim-filter-toggle" aria-controls="'+targetId+'" title="Show Filters" aria-label="Show Filters"><span class="dashicons dashicons-filter" aria-hidden="true"></span></button>');
+      }
+
+      $bar.empty().append($search);
+      if($excel.length) $bar.append($excel);
+      $bar.append($toggle);
+      $actions.empty().append($bar);
+  });
+})(jQuery);
+
+
+/* v3.16.88: remove mobile master card clones and keep only the original table */
+(function($){
+  function hrimRemoveMasterMobileCards(){
+    $('.hrim-master-mobile-list').remove();
+    $('.hrim-master-panel').removeClass('hrim-master-card-enabled');
+    $('.hrim-master-desktop-table').removeClass('hrim-master-desktop-table');
+  }
+  $(hrimRemoveMasterMobileCards);
+  $(document).on('hrim:table-refreshed ajaxComplete',hrimRemoveMasterMobileCards);
+  if(window.MutationObserver){
+    var observer=new MutationObserver(function(){ hrimRemoveMasterMobileCards(); });
+    $(function(){
+      document.querySelectorAll('.hrim-master-panel').forEach(function(panel){
+        observer.observe(panel,{childList:true,subtree:false});
+      });
+    });
+  }
+})(jQuery);
+
+/* v3.16.90: remove template download/upload controls from mobile master views */
+(function($){
+  function removeMobileTemplateActions(){
+    if(!window.matchMedia || !window.matchMedia('(max-width: 782px)').matches) return;
+    $('.hrim-template-download, .hrim-template-upload').remove();
+  }
+  $(removeMobileTemplateActions);
+  $(window).on('resize orientationchange', removeMobileTemplateActions);
+})(jQuery);
+
+/* v3.17.30: mark visually empty table rows so mobile views do not show spacer lines. */
+(function($){
+  'use strict';
+  function markBlankRows(root){
+    $(root || document).find('table.hrim-table tbody tr').each(function(){
+      var $row=$(this);
+      if($row.hasClass('hrim-empty') || $row.find('.hrim-empty').length) return;
+      if($row.find('input,select,textarea,button,a,img,svg,form').length) return;
+      var text=String($row.text()||'').replace(/\s+/g,'').replace(/[—–-]/g,'');
+      var hasMeaningfulCell=$row.children('td,th').filter(function(){
+        var value=String($(this).text()||'').replace(/\s+/g,'').replace(/[—–-]/g,'');
+        return value.length>0;
+      }).length>0;
+      $row.toggleClass('hrim-blank-table-row', !text.length && !hasMeaningfulCell);
+    });
+  }
+  $(function(){markBlankRows(document);});
+  $(document).on('hrim:content-updated',function(e,root){markBlankRows(root||document);});
+  var observer=new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      if(m.addedNodes && m.addedNodes.length){ markBlankRows(m.target); }
+    });
+  });
+  $(function(){
+    var target=document.querySelector('.hrim-content');
+    if(target) observer.observe(target,{childList:true,subtree:true});
+  });
+
+
+  /* v3.17.69: removed attribute MutationObserver that could recursively retrigger and freeze Inspection In Progress. CSS + explicit View toggle control detail visibility. */
+})(jQuery);
+
+
+/* v3.17.53: dropdown uses normal in-form positioning; fixed viewport positioning removed. */
+
+
+
+
+
+
+
+/* v3.17.71 - inline autosave for Asset Type Sort Order */
+(function($){
+  var timers={};
+  function saveAssetTypeSort($input){
+    var id=parseInt($input.attr('data-asset-type-id'),10)||0;
+    if(!id) return;
+    var value=parseInt($input.val(),10);
+    if(isNaN(value)) value=0;
+    $input.val(value);
+    var $state=$input.siblings('.hrim-inline-save-state');
+    $state.removeClass('is-saved is-error').text('Saving…');
+    $.post(HRIM.ajax,{
+      action:'hrim_update_asset_type_sort',
+      nonce:HRIM.nonce,
+      id:id,
+      sort_order:value
+    }).done(function(resp){
+      if(resp && resp.success){
+        $state.removeClass('is-error').addClass('is-saved').text('Saved');
+        window.setTimeout(function(){ $state.text('').removeClass('is-saved'); },1200);
+      }else{
+        $state.removeClass('is-saved').addClass('is-error').text((resp&&resp.data&&resp.data.message)||'Error');
+      }
+    }).fail(function(){
+      $state.removeClass('is-saved').addClass('is-error').text('Error');
+    });
+  }
+  $(document).on('input change','.hrim-inline-sort-order',function(){
+    var $input=$(this), id=$input.attr('data-asset-type-id');
+    window.clearTimeout(timers[id]);
+    timers[id]=window.setTimeout(function(){ saveAssetTypeSort($input); },450);
+  });
+  $(document).on('blur','.hrim-inline-sort-order',function(){
+    var $input=$(this), id=$input.attr('data-asset-type-id');
+    window.clearTimeout(timers[id]);
+    saveAssetTypeSort($input);
+  });
+})(jQuery);
+
+
+/* v3.17.72 - inline autosave for Floor Sort Order */
+(function($){
+  var floorSortTimers={};
+  function saveFloorSort($input){
+    var id=parseInt($input.attr('data-floor-id'),10)||0;
+    if(!id) return;
+    var value=parseInt($input.val(),10);
+    if(isNaN(value)) value=0;
+    $input.val(value);
+    var $state=$input.siblings('.hrim-inline-floor-save-state');
+    $state.removeClass('is-saved is-error').text('Saving…');
+    $.post(HRIM.ajax,{
+      action:'hrim_update_floor_sort',
+      nonce:HRIM.nonce,
+      id:id,
+      sort_order:value
+    }).done(function(resp){
+      if(resp && resp.success){
+        $state.removeClass('is-error').addClass('is-saved').text('Saved');
+        window.setTimeout(function(){ $state.text('').removeClass('is-saved'); },1200);
+      }else{
+        $state.removeClass('is-saved').addClass('is-error').text((resp&&resp.data&&resp.data.message)||'Error');
+      }
+    }).fail(function(){
+      $state.removeClass('is-saved').addClass('is-error').text('Error');
+    });
+  }
+  $(document).on('input change','.hrim-inline-floor-sort-order',function(){
+    var $input=$(this), id=$input.attr('data-floor-id');
+    window.clearTimeout(floorSortTimers[id]);
+    floorSortTimers[id]=window.setTimeout(function(){ saveFloorSort($input); },450);
+  });
+  $(document).on('blur','.hrim-inline-floor-sort-order',function(){
+    var $input=$(this), id=$input.attr('data-floor-id');
+    window.clearTimeout(floorSortTimers[id]);
+    saveFloorSort($input);
+  });
+})(jQuery);
+
+
+/* v3.17.77 - Floors mobile: physically remove hidden cells so no blank columns remain */
+(function($){
+  function compactFloorsMobile(){
+    if(!window.matchMedia('(max-width: 760px)').matches) return;
+    $('table.hrim-floors-table').each(function(){
+      var $table=$(this);
+      $table.find('.hrim-floor-col-sl, .hrim-floor-col-property, .hrim-floor-col-manager, .hrim-floor-col-status').remove();
+      $table.find('.hrim-floor-col-floor').css({'display':'table-cell','width':'56%','min-width':'0','text-align':'left','white-space':'normal','overflow-wrap':'anywhere','word-break':'break-word'});
+      $table.find('.hrim-floor-col-sort').css({'display':'table-cell','width':'20%','min-width':'0','text-align':'center'});
+      $table.find('.hrim-floor-col-action').css({'display':'table-cell','width':'24%','min-width':'0','text-align':'center'});
+      $table.css({'width':'100%','min-width':'0','max-width':'100%','table-layout':'fixed'});
+    });
+  }
+  $(compactFloorsMobile);
+  $(window).on('load orientationchange', compactFloorsMobile);
+  window.setTimeout(compactFloorsMobile,250);
+})(jQuery);
+
+
+/* v3.17.81 - Floors mobile: show only dedicated mobile table */
+(function(){
+  function hrimFloorsMobileOnly(){
+    var mobile = window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+    document.querySelectorAll('.hrim-floors-panel').forEach(function(panel){
+      var desktop = panel.querySelector('.hrim-floors-desktop-wrap');
+      var mobileWrap = panel.querySelector('.hrim-floors-mobile-wrap');
+      if(desktop){
+        if(mobile){ desktop.style.setProperty('display','none','important'); }
+        else { desktop.style.removeProperty('display'); }
+      }
+      if(mobileWrap){
+        if(mobile){ mobileWrap.style.setProperty('display','block','important'); }
+        else { mobileWrap.style.setProperty('display','none','important'); }
+      }
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hrimFloorsMobileOnly);
+  else hrimFloorsMobileOnly();
+  window.addEventListener('load', hrimFloorsMobileOnly);
+  window.addEventListener('resize', hrimFloorsMobileOnly);
+  window.addEventListener('orientationchange', hrimFloorsMobileOnly);
+  setTimeout(hrimFloorsMobileOnly, 250);
+  setTimeout(hrimFloorsMobileOnly, 1000);
+})();
+
+/* v3.19.23: click System Vs Security row to show/hide floor-wise detail directly below */
+jQuery(function($){
+  $(document).on('click keydown','.hrim-occupancy-compare-row',function(e){
+    if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
+    if($(e.target).closest('a,button,input,select,textarea,label,form').length) return;
+    if(e.type==='keydown') e.preventDefault();
+    var target=$(this).attr('data-target');
+    if(!target) return;
+    var $detail=$('#'+target);
+    var opening=$detail.prop('hidden');
+    $('.hrim-occupancy-compare-detail-row').prop('hidden',true).attr('hidden','hidden');
+    $('.hrim-occupancy-compare-row').removeClass('is-expanded').attr('aria-expanded','false');
+    if(opening){
+      $detail.prop('hidden',false).removeAttr('hidden');
+      $(this).addClass('is-expanded').attr('aria-expanded','true');
+    }
+  });
+});
+
+/* v3.19.24: click floor row inside System Vs Security details to show Security Yes assets */
+jQuery(function($){
+  $(document).on('click keydown','.hrim-occupancy-floor-compare-row',function(e){
+    if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
+    if($(e.target).closest('a,button,input,select,textarea,label,form').length) return;
+    if(e.type==='keydown') e.preventDefault();
+    e.stopPropagation();
+    var target=$(this).attr('data-target');
+    if(!target) return;
+    var $detail=$('#'+target);
+    var opening=$detail.prop('hidden');
+    var $table=$(this).closest('.hrim-occupancy-floor-compare-table');
+    $table.find('.hrim-occupancy-floor-asset-detail-row').prop('hidden',true).attr('hidden','hidden');
+    $table.find('.hrim-occupancy-floor-compare-row').removeClass('is-expanded').attr('aria-expanded','false');
+    if(opening){
+      $detail.prop('hidden',false).removeAttr('hidden');
+      $(this).addClass('is-expanded').attr('aria-expanded','true');
+    }
+  });
+});
+
+/* v3.19.43: keep expandable issue history details available after table search/pagination. */
+(function($){
+  $(document).on('click','.hrim-issue-history-main-row',function(){
+    var mobileScreen=Math.min((window.screen&&window.screen.width)||9999,(window.screen&&window.screen.height)||9999)<=767;
+    if(mobileScreen) return;
+    var id=$(this).attr('data-history-detail');
+    if(!id) return;
+    var detail=document.getElementById(id);
+    if(!detail) return;
+    if(this.nextSibling!==detail){ this.parentNode.insertBefore(detail,this.nextSibling); }
+    detail.classList.remove('hrim-pagination-hidden');
+    detail.style.removeProperty('display');
+    detail.removeAttribute('aria-hidden');
+  });
+})(jQuery);
+
+/* v3.19.53: never render issue detail rows on phone-sized screens. */
+(function($){
+  $(function(){
+    var mobileScreen=Math.min((window.screen&&window.screen.width)||9999,(window.screen&&window.screen.height)||9999)<=767;
+    if(!mobileScreen) return;
+    $('.hrim-issue-history-detail-row,.hrim-supervision-detail-row').remove();
+    $('.hrim-issue-history-main-row').removeAttr('data-history-detail').css('cursor','default');
+    $('.hrim-supervision-main-row').removeAttr('data-detail').css('cursor','default');
+  });
+})(jQuery);
+
+
+/* v3.19.72: definitive mobile issue-detail removal after any table refresh. */
+(function($){
+  function isNarrow(){
+    return (document.documentElement && document.documentElement.clientWidth <= 767) ||
+           (window.innerWidth && window.innerWidth <= 767) ||
+           (window.visualViewport && window.visualViewport.width <= 767);
+  }
+  function purgeIssueDetails(){
+    if(!isNarrow()) return;
+    document.querySelectorAll('tr.hrim-issue-history-detail-row,tr.hrim-supervision-detail-row').forEach(function(row){ row.remove(); });
+    document.querySelectorAll('.hrim-issue-history-main-row,.hrim-supervision-main-row').forEach(function(row){
+      row.removeAttribute('data-history-detail');
+      row.removeAttribute('data-detail');
+      row.removeAttribute('data-detail-target');
+      row.style.cursor='default';
+    });
+  }
+  $(purgeIssueDetails);
+  $(window).on('load resize orientationchange', purgeIssueDetails);
+  $(document).on('hrim:content-updated ajaxComplete', function(){ setTimeout(purgeIssueDetails,0); });
+  var mo = new MutationObserver(function(){ if(isNarrow()) purgeIssueDetails(); });
+  $(function(){ if(document.body) mo.observe(document.body,{childList:true,subtree:true}); });
+})(jQuery);
+
+/* v3.19.82: keep dedicated issue cards synchronized with Search on mobile. */
+(function($){
+  function filterDedicatedCards(input){
+    var q=String($(input).val()||'').toLowerCase().replace(/\s+/g,' ').trim();
+    var $scope=$(input).closest('.hrim-content');
+    $scope.find('.hrim-dedicated-mobile-cards .hrim-mobile-issue-card').each(function(){
+      var txt=String($(this).attr('data-search')||$(this).text()||'').toLowerCase();
+      $(this).toggle(!q || txt.indexOf(q)!==-1);
+    });
+  }
+  $(document).on('input','.hrim-content.hrim-view-pending_issues .hrim-table-search,.hrim-content.hrim-view-pending_supervision .hrim-table-search',function(){filterDedicatedCards(this);});
 })(jQuery);

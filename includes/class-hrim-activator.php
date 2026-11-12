@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 class HRIM_Activator {
-    const DB_VERSION = '3.16.19';
+    const DB_VERSION = '3.19.39';
 
     public static function activate() {
         self::create_roles();
@@ -20,28 +20,27 @@ class HRIM_Activator {
             'hotel-inspection-login'      => ['Login', '[hrim_login]'],
             'hotel-inspection-dashboard'  => ['Dashboard', '[hrim_dashboard]'],
             'hotel-inspection-room-scores' => ['Room Score', '[hrim_room_scores]'],
-            'hotel-inspection-floor-scores' => ['Floor Score', '[hrim_floor_scores]'],
-            'hotel-inspection-properties' => ['Properties', '[hrim_properties]'],
             'hotel-inspection-floors'     => ['Floors', '[hrim_floors]'],
             'hotel-inspection-asset-types' => ['Asset Types', '[hrim_asset_types]'],
             'hotel-inspection-rooms'      => ['Assets', '[hrim_rooms]'],
             'hotel-inspection-checklist-sections' => ['Checklist Sections', '[hrim_sections]'],
-            'hotel-inspection-sectionwise-checklist' => ['Sectionwise Checklist', '[hrim_sectionwise_checklist]'],
-            'hotel-inspection-templates'  => ['Inspection Templates', '[hrim_templates]'],
+            'hotel-inspection-sectionwise-checklist' => ['Sectionwise Checklists', '[hrim_sectionwise_checklist]'],
             'perform-room-inspection'     => ['Perform Inspection', '[hrim_inspection_form]'],
             'hotel-inspection-in-progress' => ['Inspection In Progress', '[hrim_inspection_in_progress]'],
-            'hotel-inspection-schedule-tasks-in-progress' => ['Schedule Tasks In Progress', '[hrim_schedule_tasks_in_progress]'],
-            'hotel-inspection-schedule-tasks-history' => ['Schedule Tasks History', '[hrim_schedule_tasks_history]'],
-            'hotel-inspection-periodic-tasks' => ['Periodic Tasks', '[hrim_periodic_tasks]'],
-            'hotel-inspection-add-periodic-task' => ['Add Periodic Tasks', '[hrim_add_periodic_task]'],
+            'hotel-inspection-schedule-tasks-in-progress' => ['Due Periodic Tasks', '[hrim_schedule_tasks_in_progress]'],
+            'hotel-inspection-schedule-tasks-history' => ['Upcoming Periodic Tasks', '[hrim_schedule_tasks_history]'],
+            'hotel-inspection-periodic-tasks' => ['Periodic Task', '[hrim_periodic_tasks]'],
+            'hotel-inspection-add-periodic-task' => ['Add Periodic Task', '[hrim_add_periodic_task]'],
             'hotel-inspection-update-periodic-task' => ['Update Periodic Task', '[hrim_update_periodic_task]'],
             'hotel-inspection-add-occupancy' => ['Add Occupancy', '[hrim_add_occupancy]'],
             'hotel-inspection-update-office-count' => ['Update Office Count', '[hrim_update_office_count]'],
             'hotel-inspection-occupancy-check' => ['Occupancy Check', '[hrim_occupancy_check]'],
             'hotel-inspection-history'    => ['Inspection History', '[hrim_history]'],
+            'hotel-inspection-add-issue'  => ['Add Issue', '[hrim_add_issue]'],
             'hotel-inspection-issues'     => ['Issues', '[hrim_issues]'],
             'hotel-inspection-pending-assign-issues' => ['Pending Assign Issue', '[hrim_pending_assign_issues]'],
             'hotel-inspection-pending-issues' => ['Pending Issues', '[hrim_pending_issues]'],
+            'hotel-inspection-pending-supervision' => ['Pending Supervision', '[hrim_pending_supervision]'],
             'hotel-inspection-resolved-issues' => ['Issue Resolved', '[hrim_resolved_issues]'],
             'hotel-inspection-reports'    => ['Reports', '[hrim_reports]'],
             'hotel-inspection-learn'      => ['Learn', '[hrim_learn]'],
@@ -76,6 +75,13 @@ class HRIM_Activator {
             }
             if (!is_wp_error($id)) $ids[$slug] = (int) $id;
         }
+        // The Template master was retired in v3.19.00. Remove its generated
+        // application page so it cannot remain accessible after an upgrade.
+        $retired_template_page = get_page_by_path('hotel-inspection-templates', OBJECT, 'page');
+        if ($retired_template_page && get_post_meta($retired_template_page->ID, '_hrim_app_page', true) === '1') {
+            wp_delete_post($retired_template_page->ID, true);
+        }
+        unset($ids['hotel-inspection-templates']);
         update_option('hrim_page_ids', $ids);
     }
 
@@ -119,6 +125,7 @@ class HRIM_Activator {
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_rooms (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,hotel_id BIGINT UNSIGNED NOT NULL,floor_id BIGINT UNSIGNED NOT NULL,asset_type_id BIGINT UNSIGNED NULL,category_id BIGINT UNSIGNED NULL,template_id BIGINT UNSIGNED NULL,room_no VARCHAR(100) NOT NULL,category VARCHAR(190) NULL,status VARCHAR(30) NOT NULL DEFAULT 'active',PRIMARY KEY(id),KEY hotel_id(hotel_id),KEY floor_id(floor_id),KEY asset_type_id(asset_type_id),KEY category_id(category_id),KEY template_id(template_id),UNIQUE KEY unique_room(hotel_id,room_no)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_category_templates (category_id BIGINT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(category_id,template_id),KEY template_id(template_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_room_templates (room_id BIGINT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(room_id,template_id),KEY template_id(template_id)) $c;";
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_room_sections (room_id BIGINT UNSIGNED NOT NULL,section_id BIGINT UNSIGNED NOT NULL,sort_order INT NOT NULL DEFAULT 0,PRIMARY KEY(room_id,section_id),KEY section_id(section_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_room_template_exclusions (room_id BIGINT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(room_id,template_id),KEY template_id(template_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_room_question_exclusions (room_id BIGINT UNSIGNED NOT NULL,question_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(room_id,question_id),KEY question_id(question_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_room_question_removals (room_id BIGINT UNSIGNED NOT NULL,question_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(room_id,question_id),KEY question_id(question_id)) $c;";
@@ -130,7 +137,7 @@ class HRIM_Activator {
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_notification_log (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,event_key VARCHAR(190) NULL,notification_type VARCHAR(60) NOT NULL,department_id BIGINT UNSIGNED NULL,channel VARCHAR(30) NOT NULL,destination VARCHAR(190) NULL,message LONGTEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'pending',api_response LONGTEXT NULL,attempts INT NOT NULL DEFAULT 0,scheduled_at DATETIME NULL,sent_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(id),KEY event_key(event_key),KEY notification_type(notification_type),KEY department_id(department_id),KEY status(status),KEY created_at(created_at)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_user_departments (user_id BIGINT UNSIGNED NOT NULL,department_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(user_id,department_id),KEY department_id(department_id)) $c;";
 
-        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_tasks (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,task_name VARCHAR(190) NOT NULL,periodicity VARCHAR(30) NOT NULL,start_date DATE NOT NULL,department_id BIGINT UNSIGNED NOT NULL,assigned_to BIGINT UNSIGNED NOT NULL,reminder_value INT NOT NULL DEFAULT 1,reminder_unit VARCHAR(20) NOT NULL DEFAULT 'days',status VARCHAR(20) NOT NULL DEFAULT 'active',created_by BIGINT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,PRIMARY KEY(id),KEY department_id(department_id),KEY assigned_to(assigned_to),KEY status(status)) $c;";
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_tasks (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,task_name VARCHAR(190) NOT NULL,asset_type_id BIGINT UNSIGNED NULL,periodicity VARCHAR(30) NOT NULL,start_date DATE NOT NULL,department_id BIGINT UNSIGNED NOT NULL,assigned_to BIGINT UNSIGNED NOT NULL,reminder_value INT NOT NULL DEFAULT 1,reminder_unit VARCHAR(20) NOT NULL DEFAULT 'days',status VARCHAR(20) NOT NULL DEFAULT 'active',created_by BIGINT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,PRIMARY KEY(id),KEY asset_type_id(asset_type_id),KEY department_id(department_id),KEY assigned_to(assigned_to),KEY status(status)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_categories (task_id BIGINT UNSIGNED NOT NULL,category_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(task_id,category_id),KEY category_id(category_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_sections (task_id BIGINT UNSIGNED NOT NULL,section_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(task_id,section_id),KEY section_id(section_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_question_exclusions (task_id BIGINT UNSIGNED NOT NULL,question_id BIGINT UNSIGNED NOT NULL,PRIMARY KEY(task_id,question_id),KEY question_id(question_id)) $c;";
@@ -138,15 +145,63 @@ class HRIM_Activator {
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_rooms (instance_id BIGINT UNSIGNED NOT NULL,room_id BIGINT UNSIGNED NOT NULL,category_id BIGINT UNSIGNED NULL,status VARCHAR(30) NOT NULL DEFAULT 'pending',remarks TEXT NULL,photo_attachment_id BIGINT UNSIGNED NULL,completed_at DATETIME NULL,completed_by BIGINT UNSIGNED NULL,updated_at DATETIME NULL,PRIMARY KEY(instance_id,room_id),KEY room_id(room_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_update_log (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,instance_id BIGINT UNSIGNED NOT NULL,task_id BIGINT UNSIGNED NOT NULL,room_id BIGINT UNSIGNED NOT NULL,category_id BIGINT UNSIGNED NULL,section_id BIGINT UNSIGNED NULL,question_id BIGINT UNSIGNED NULL,answer VARCHAR(10) NULL,status VARCHAR(30) NOT NULL DEFAULT 'pending',remarks TEXT NULL,photo_attachment_id BIGINT UNSIGNED NULL,completed_at DATETIME NULL,next_action_date DATE NULL,updated_by BIGINT UNSIGNED NULL,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(id),KEY instance_id(instance_id),KEY task_id(task_id),KEY room_id(room_id),KEY question_id(question_id),KEY updated_by(updated_by),KEY updated_at(updated_at)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_periodic_task_answers (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,instance_id BIGINT UNSIGNED NOT NULL,room_id BIGINT UNSIGNED NOT NULL,section_id BIGINT UNSIGNED NOT NULL,question_id BIGINT UNSIGNED NOT NULL,answer VARCHAR(10) NULL,remarks TEXT NULL,photo_attachment_id BIGINT UNSIGNED NULL,updated_by BIGINT UNSIGNED NULL,updated_at DATETIME NULL,PRIMARY KEY(id),UNIQUE KEY answer_unique(instance_id,room_id,question_id),KEY instance_id(instance_id),KEY room_id(room_id)) $c;";
-        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_questions (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,template_id BIGINT UNSIGNED NOT NULL DEFAULT 0,section_id BIGINT UNSIGNED NULL,section_name VARCHAR(190) NULL,question TEXT NOT NULL,question_type VARCHAR(30) NOT NULL DEFAULT 'yes_no',required_flag TINYINT(1) NOT NULL DEFAULT 0,is_library TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,PRIMARY KEY(id),KEY template_id(template_id),KEY section_id(section_id),KEY is_library(is_library)) $c;";
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_questions (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,template_id BIGINT UNSIGNED NOT NULL DEFAULT 0,section_id BIGINT UNSIGNED NULL,department_id BIGINT UNSIGNED NULL,section_name VARCHAR(190) NULL,question TEXT NOT NULL,question_type VARCHAR(30) NOT NULL DEFAULT 'yes_no',required_flag TINYINT(1) NOT NULL DEFAULT 0,is_library TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,PRIMARY KEY(id),KEY template_id(template_id),KEY section_id(section_id),KEY department_id(department_id),KEY is_library(is_library)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_inspections (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,hotel_id BIGINT UNSIGNED NOT NULL,floor_id BIGINT UNSIGNED NOT NULL,room_id BIGINT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NOT NULL,inspector_id BIGINT UNSIGNED NOT NULL,status VARCHAR(30) NOT NULL DEFAULT 'completed',overall_score DECIMAL(8,2) NULL,remarks TEXT NULL,attachment_ids TEXT NULL,submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,started_at DATETIME NULL,last_saved_at DATETIME NULL,completed_at DATETIME NULL,draft_batch_id VARCHAR(64) NULL,PRIMARY KEY(id),KEY room_id(room_id),KEY inspector_id(inspector_id),KEY submitted_at(submitted_at),KEY draft_batch_id(draft_batch_id),KEY status(status)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_answers (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,inspection_id BIGINT UNSIGNED NOT NULL,question_id BIGINT UNSIGNED NOT NULL,answer_text LONGTEXT NULL,result_status VARCHAR(20) NULL,remarks TEXT NULL,attachment_ids TEXT NULL,video_attachment_ids TEXT NULL,PRIMARY KEY(id),KEY inspection_id(inspection_id),KEY question_id(question_id)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_issues (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,source VARCHAR(20) NOT NULL DEFAULT 'inspection',inspection_id BIGINT UNSIGNED NULL,hotel_id BIGINT UNSIGNED NULL,floor_id BIGINT UNSIGNED NULL,room_id BIGINT UNSIGNED NULL,section_id BIGINT UNSIGNED NULL,department_id BIGINT UNSIGNED NULL,question_id BIGINT UNSIGNED NULL,title VARCHAR(255) NOT NULL,description TEXT NULL,priority VARCHAR(20) NOT NULL DEFAULT 'medium',status VARCHAR(30) NOT NULL DEFAULT 'open',assigned_to BIGINT UNSIGNED NULL,due_date DATE NULL,reported_by BIGINT UNSIGNED NULL,resolution_remarks TEXT NULL,attachment_ids TEXT NULL,resolution_attachment_ids TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,resolved_at DATETIME NULL,resolved_by BIGINT UNSIGNED NULL,verified_at DATETIME NULL,verified_by BIGINT UNSIGNED NULL,PRIMARY KEY(id),KEY inspection_id(inspection_id),KEY hotel_id(hotel_id),KEY floor_id(floor_id),KEY room_id(room_id),KEY section_id(section_id),KEY status(status),KEY source(source)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_issue_updates (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,issue_id BIGINT UNSIGNED NOT NULL,update_type VARCHAR(30) NOT NULL DEFAULT 'progress',status VARCHAR(30) NULL,remarks TEXT NULL,attachment_ids TEXT NULL,update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_by BIGINT UNSIGNED NULL,assigned_to BIGINT UNSIGNED NULL,due_date DATE NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(id),KEY issue_id(issue_id),KEY status(status),KEY updated_by(updated_by)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_occupancy_checks (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,hotel_id BIGINT UNSIGNED NOT NULL,check_date DATE NOT NULL,system_count INT NULL,system_updated_by BIGINT UNSIGNED NULL,created_by BIGINT UNSIGNED NOT NULL,created_at DATETIME NOT NULL,updated_at DATETIME NOT NULL,PRIMARY KEY(id),KEY hotel_id(hotel_id),KEY check_date(check_date),KEY system_updated_by(system_updated_by)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_occupancy_check_rooms (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,occupancy_check_id BIGINT UNSIGNED NOT NULL,floor_id BIGINT UNSIGNED NOT NULL,room_id BIGINT UNSIGNED NOT NULL,status VARCHAR(10) NULL,updated_by BIGINT UNSIGNED NULL,updated_at DATETIME NULL,created_at DATETIME NOT NULL,PRIMARY KEY(id),UNIQUE KEY check_room(occupancy_check_id,room_id),KEY occupancy_check_id(occupancy_check_id),KEY floor_id(floor_id),KEY room_id(room_id),KEY status(status)) $c;";
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_occupancy_floor_system_counts (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,occupancy_check_id BIGINT UNSIGNED NOT NULL,floor_id BIGINT UNSIGNED NOT NULL,system_count INT NOT NULL DEFAULT 0,updated_by BIGINT UNSIGNED NULL,updated_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(id),UNIQUE KEY check_floor(occupancy_check_id,floor_id),KEY occupancy_check_id(occupancy_check_id),KEY floor_id(floor_id),KEY updated_by(updated_by)) $c;";
         $sql[] = "CREATE TABLE {$wpdb->prefix}hrim_audit_log (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,user_id BIGINT UNSIGNED NULL,module VARCHAR(80) NOT NULL,action_name VARCHAR(40) NOT NULL,record_id BIGINT UNSIGNED NULL,details LONGTEXT NULL,ip_address VARCHAR(100) NULL,user_agent TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(id),KEY user_id(user_id),KEY module(module),KEY action_name(action_name),KEY created_at(created_at)) $c;";
         foreach ($sql as $q) dbDelta($q);
+
+        // Convert all existing asset/template assignments into direct asset/section
+        // assignments. Legacy tables remain only so historical inspection records
+        // can still be read safely; new workflows no longer use templates.
+        if (!get_option('hrim_direct_sections_migrated')) {
+        $wpdb->query("INSERT IGNORE INTO {$wpdb->prefix}hrim_room_sections (room_id,section_id,sort_order)
+            SELECT DISTINCT assigned.room_id,ts.section_id,ts.sort_order
+            FROM (
+                SELECT room_id,template_id FROM {$wpdb->prefix}hrim_room_templates
+                UNION
+                SELECT r.id,ct.template_id FROM {$wpdb->prefix}hrim_rooms r
+                INNER JOIN {$wpdb->prefix}hrim_category_templates ct ON ct.category_id=r.category_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions x
+                    WHERE x.room_id=r.id AND x.template_id=ct.template_id
+                )
+            ) assigned
+            INNER JOIN {$wpdb->prefix}hrim_template_sections ts ON ts.template_id=assigned.template_id");
+        update_option('hrim_direct_sections_migrated', 1, false);
+        }
+
+        // One-time removal of two sections installed by the retired default
+        // library. Do this only before the new v2 library has been installed.
+        if (get_option('hrim_checklist_library_version', '') !== '2.0' && !get_option('hrim_legacy_default_sections_removed')) {
+            $legacy_names = ['Bathroom Amenities', 'Housekeeping Final Room Check'];
+            foreach ($legacy_names as $legacy_name) {
+                $section_id = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) LIMIT 1", $legacy_name));
+                if (!$section_id) continue;
+                $question_ids = array_map('intval', $wpdb->get_col($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_questions WHERE section_id=%d", $section_id)));
+                if ($question_ids) {
+                    $ids = implode(',', $question_ids);
+                    $used_ids = array_map('intval', $wpdb->get_col("SELECT q.id FROM {$wpdb->prefix}hrim_questions q WHERE q.id IN ({$ids}) AND (EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_answers a WHERE a.question_id=q.id) OR EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_issues i WHERE i.question_id=q.id) OR EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_periodic_task_answers pa WHERE pa.question_id=q.id) OR EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_periodic_task_update_log pl WHERE pl.question_id=q.id))"));
+                    $unused_ids = array_values(array_diff($question_ids, $used_ids));
+                    $wpdb->query("DELETE FROM {$wpdb->prefix}hrim_room_question_exclusions WHERE question_id IN ({$ids})");
+                    $wpdb->query("DELETE FROM {$wpdb->prefix}hrim_room_question_removals WHERE question_id IN ({$ids})");
+                    $wpdb->query("DELETE FROM {$wpdb->prefix}hrim_room_question_additions WHERE question_id IN ({$ids})");
+                    $wpdb->query("DELETE FROM {$wpdb->prefix}hrim_periodic_task_question_exclusions WHERE question_id IN ({$ids})");
+                    if ($unused_ids) $wpdb->query("DELETE FROM {$wpdb->prefix}hrim_questions WHERE id IN (" . implode(',', $unused_ids) . ")");
+                    if ($used_ids) $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}hrim_questions SET is_library=0,section_id=NULL,template_id=0,section_name=%s WHERE id IN (" . implode(',', $used_ids) . ")", $legacy_name));
+                }
+                $wpdb->delete($wpdb->prefix . 'hrim_room_sections', ['section_id'=>$section_id]);
+                $wpdb->delete($wpdb->prefix . 'hrim_periodic_task_sections', ['section_id'=>$section_id]);
+                $wpdb->delete($wpdb->prefix . 'hrim_template_sections', ['section_id'=>$section_id]);
+                $wpdb->delete($wpdb->prefix . 'hrim_sections', ['id'=>$section_id]);
+            }
+            update_option('hrim_legacy_default_sections_removed', 1, false);
+        }
 
         // Floor manager assignment.
         $floors_table = $wpdb->prefix . 'hrim_floors';
@@ -158,6 +213,8 @@ class HRIM_Activator {
         $asset_types_table=$wpdb->prefix.'hrim_asset_types';
         self::ensure_column($wpdb->prefix.'hrim_rooms','asset_type_id','BIGINT UNSIGNED NULL AFTER floor_id');
         self::ensure_index($wpdb->prefix.'hrim_rooms','asset_type_id','asset_type_id');
+        self::ensure_column($wpdb->prefix.'hrim_periodic_tasks','asset_type_id','BIGINT UNSIGNED NULL AFTER task_name');
+        self::ensure_index($wpdb->prefix.'hrim_periodic_tasks','asset_type_id','asset_type_id');
         $room_asset_type=(int)$wpdb->get_var("SELECT id FROM {$asset_types_table} WHERE LOWER(name)='room' LIMIT 1");
         if(!$room_asset_type){$wpdb->insert($asset_types_table,['name'=>'Room','description'=>'Guest room or accommodation unit','sort_order'=>1,'status'=>'active']);$room_asset_type=(int)$wpdb->insert_id;}
         if($room_asset_type)$wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}hrim_rooms SET asset_type_id=%d WHERE asset_type_id IS NULL OR asset_type_id=0",$room_asset_type));
@@ -167,6 +224,8 @@ class HRIM_Activator {
         // indexes and legacy table definitions differ.
         self::ensure_column($wpdb->prefix . 'hrim_questions', 'section_id', 'BIGINT UNSIGNED NULL AFTER template_id');
         self::ensure_index($wpdb->prefix . 'hrim_questions', 'section_id', 'section_id');
+        self::ensure_column($wpdb->prefix . 'hrim_questions', 'department_id', 'BIGINT UNSIGNED NULL AFTER section_id');
+        self::ensure_index($wpdb->prefix . 'hrim_questions', 'department_id', 'department_id');
         self::ensure_column($wpdb->prefix . 'hrim_questions', 'is_library', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER required_flag');
         self::ensure_column($wpdb->prefix . 'hrim_departments', 'department_head_user_id', 'BIGINT UNSIGNED NULL AFTER name');
         self::ensure_column($wpdb->prefix . 'hrim_departments', 'telegram_chat_id', 'VARCHAR(190) NULL AFTER department_head_user_id');
@@ -177,6 +236,9 @@ class HRIM_Activator {
         self::ensure_index($wpdb->prefix . 'hrim_sections', 'department_id', 'department_id');
         self::ensure_column($wpdb->prefix . 'hrim_answers', 'video_attachment_ids', 'TEXT NULL AFTER attachment_ids');
         self::ensure_index($wpdb->prefix . 'hrim_questions', 'is_library', 'is_library');
+
+        // v3.19.33: Departments are now stored per checkpoint instead of being shown as part of the Section field.
+        $wpdb->query("UPDATE {$wpdb->prefix}hrim_questions q INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id SET q.department_id=s.department_id WHERE q.is_library=1 AND (q.department_id IS NULL OR q.department_id=0) AND s.department_id IS NOT NULL AND s.department_id>0");
 
         // Periodic room-task completion fields for installations upgraded from
         // versions that created the table before room-wise task updates existed.
@@ -223,6 +285,23 @@ class HRIM_Activator {
         self::ensure_index($issues_table, 'floor_id', 'floor_id');
         self::ensure_index($issues_table, 'section_id', 'section_id');
         $wpdb->query("UPDATE `{$issues_table}` SET source='inspection' WHERE source IS NULL OR source=''");
+
+        // v3.19.80: Backfill unresolved inspection issues to the responsible checkpoint Department Head.
+        // This also repairs issues created before automatic Department Head assignment was introduced.
+        $wpdb->query("UPDATE `{$issues_table}` x
+            LEFT JOIN `{$wpdb->prefix}hrim_questions` q ON q.id=x.question_id
+            LEFT JOIN `{$wpdb->prefix}hrim_sections` s ON s.id=COALESCE(NULLIF(x.section_id,0),q.section_id)
+            INNER JOIN `{$wpdb->prefix}hrim_departments` d ON d.id=COALESCE(NULLIF(q.department_id,0),NULLIF(x.department_id,0),NULLIF(s.department_id,0))
+            INNER JOIN `{$wpdb->users}` hu ON hu.ID=d.department_head_user_id
+            SET x.department_id=d.id,
+                x.assigned_to=d.department_head_user_id,
+                x.status=CASE WHEN x.status IN ('open','reopened') THEN 'assigned' ELSE x.status END
+            WHERE x.source='inspection'
+              AND (x.assigned_to IS NULL OR x.assigned_to=0)
+              AND x.status IN ('open','assigned','reopened','in_progress')
+              AND d.status='active'
+              AND d.department_head_user_id IS NOT NULL
+              AND d.department_head_user_id>0");
 
         if(!(int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_departments")){
             $wpdb->insert($wpdb->prefix.'hrim_departments',['name'=>'General','description'=>'Default department for migrated records','sort_order'=>1,'status'=>'active']);

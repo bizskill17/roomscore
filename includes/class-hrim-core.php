@@ -12,16 +12,19 @@ class HRIM_Core {
         add_action('send_headers',[$this,'send_no_cache_headers']);
         add_action('admin_menu',[$this,'admin_menu']);
         add_action('admin_init',[$this,'admin_redirect']);
+        // Keep visitors on the branded RoomScore login screen instead of exposing wp-login.php.
+        add_action('login_init',[$this,'redirect_core_login_screen'],1);
+        add_action('wp_login_failed',[$this,'redirect_failed_login']);
         add_filter('cron_schedules',[$this,'cron_schedules']);
         add_action('hrim_notification_cron',[$this,'run_notification_triggers']);
         foreach ([
             'hrim_login'=>'login_shortcode','hrim_dashboard'=>'dashboard_shortcode','hrim_room_scores'=>'room_scores_shortcode','hrim_floor_scores'=>'floor_scores_shortcode','hrim_properties'=>'properties_shortcode',
-            'hrim_floors'=>'floors_shortcode','hrim_asset_types'=>'asset_types_shortcode','hrim_room_categories'=>'room_categories_shortcode','hrim_rooms'=>'rooms_shortcode','hrim_sections'=>'sections_shortcode','hrim_sectionwise_checklist'=>'sectionwise_checklist_shortcode','hrim_templates'=>'templates_shortcode','hrim_inspection_form'=>'inspection_form_shortcode','hrim_inspection_in_progress'=>'inspection_in_progress_shortcode','hrim_schedule_tasks_in_progress'=>'schedule_tasks_in_progress_shortcode','hrim_schedule_tasks_history'=>'periodic_update_log_shortcode','hrim_periodic_tasks'=>'periodic_tasks_shortcode','hrim_add_periodic_task'=>'add_periodic_task_shortcode','hrim_update_periodic_task'=>'update_periodic_task_shortcode','hrim_add_occupancy'=>'add_occupancy_shortcode','hrim_update_office_count'=>'update_office_count_shortcode','hrim_occupancy_check'=>'occupancy_check_shortcode','hrim_history'=>'history_shortcode',
-            'hrim_issues'=>'issues_shortcode','hrim_pending_assign_issues'=>'pending_assign_issues_shortcode','hrim_pending_issues'=>'pending_issues_shortcode','hrim_resolved_issues'=>'resolved_issues_shortcode','hrim_reports'=>'reports_shortcode','hrim_departments'=>'departments_shortcode','hrim_users'=>'users_shortcode',
+            'hrim_floors'=>'floors_shortcode','hrim_asset_types'=>'asset_types_shortcode','hrim_room_categories'=>'room_categories_shortcode','hrim_rooms'=>'rooms_shortcode','hrim_sections'=>'sections_shortcode','hrim_sectionwise_checklist'=>'sectionwise_checklist_shortcode','hrim_inspection_form'=>'inspection_form_shortcode','hrim_inspection_in_progress'=>'inspection_in_progress_shortcode','hrim_schedule_tasks_in_progress'=>'schedule_tasks_in_progress_shortcode','hrim_schedule_tasks_history'=>'periodic_update_log_shortcode','hrim_periodic_tasks'=>'periodic_tasks_shortcode','hrim_add_periodic_task'=>'add_periodic_task_shortcode','hrim_update_periodic_task'=>'update_periodic_task_shortcode','hrim_add_occupancy'=>'add_occupancy_shortcode','hrim_update_office_count'=>'update_office_count_shortcode','hrim_occupancy_check'=>'occupancy_check_shortcode','hrim_history'=>'history_shortcode',
+            'hrim_add_issue'=>'add_issue_shortcode','hrim_issues'=>'issues_shortcode','hrim_pending_assign_issues'=>'pending_assign_issues_shortcode','hrim_pending_issues'=>'pending_issues_shortcode','hrim_pending_supervision'=>'pending_supervision_shortcode','hrim_resolved_issues'=>'resolved_issues_shortcode','hrim_reports'=>'reports_shortcode','hrim_departments'=>'departments_shortcode','hrim_users'=>'users_shortcode',
             'hrim_profile'=>'profile_shortcode','hrim_settings'=>'settings_shortcode','hrim_communications'=>'communications_shortcode','hrim_learn'=>'learn_shortcode','hrim_audit_log'=>'audit_log_shortcode'
         ] as $tag=>$method) add_shortcode($tag,[$this,$method]);
 
-        foreach (['save_periodic_task','delete_periodic_task','delete_periodic_instance','delete_schedule_task_instance','delete_periodic_update_log','save_periodic_task_answers','save_hotel','delete_hotel','save_floor','delete_floor','save_asset_type','delete_asset_type','save_room_category','delete_room_category','save_room','delete_room','save_department','delete_department','save_section','delete_section','save_template','delete_template','save_question','delete_question','submit_inspection','delete_inspection','delete_in_progress','save_issue','assign_issue','progress_issue','update_issue','delete_issue','save_user','update_user_status','delete_user','save_profile','save_settings','save_meta_settings','save_notification_settings','test_whatsapp','test_telegram','run_notifications_now','regenerate_pages','install_dummy_data','install_checklist_library','clear_dummy_data','repair_application','clear_audit_log','create_occupancy_check','save_occupancy_office_count','download_master_template','upload_master_template'] as $a)
+        foreach (['save_periodic_task','delete_periodic_task','delete_periodic_instance','delete_schedule_task_instance','delete_periodic_update_log','save_periodic_task_answers','save_hotel','delete_hotel','save_floor','delete_floor','save_asset_type','delete_asset_type','save_room_category','delete_room_category','save_room','delete_room','save_department','delete_department','save_section','delete_section','save_question','delete_question','submit_inspection','delete_inspection','delete_in_progress','save_issue','assign_issue','progress_issue','update_issue','save_issue_supervision','delete_issue','save_user','update_user_status','delete_user','save_profile','save_settings','save_meta_settings','save_notification_settings','test_whatsapp','test_telegram','run_notifications_now','regenerate_pages','install_dummy_data','install_checklist_library','clear_dummy_data','repair_application','clear_audit_log','refresh_storage_usage','create_occupancy_check','save_occupancy_office_count','delete_occupancy_check','download_master_template','upload_master_template'] as $a)
             add_action('admin_post_hrim_'.$a,[$this,$a]);
         add_action('wp_ajax_hrim_get_rooms',[$this,'ajax_get_rooms']);
         add_action('wp_ajax_hrim_get_questions',[$this,'ajax_get_questions']);
@@ -30,7 +33,11 @@ class HRIM_Core {
         add_action('wp_ajax_hrim_upload_video',[$this,'ajax_upload_video']);
         add_action('wp_ajax_hrim_save_occupancy_room',[$this,'ajax_save_occupancy_room']);
         add_action('wp_ajax_hrim_save_occupancy_system',[$this,'ajax_save_occupancy_system']);
+        add_action('wp_ajax_hrim_save_floor_system_count',[$this,'ajax_save_floor_system_count']);
         add_action('wp_ajax_hrim_save_learn_progress',[$this,'ajax_save_learn_progress']);
+        add_action('wp_ajax_hrim_update_asset_type_sort',[$this,'ajax_update_asset_type_sort']);
+        add_action('wp_ajax_hrim_update_floor_sort',[$this,'ajax_update_floor_sort']);
+        add_action('delete_attachment',[$this,'invalidate_storage_cache']);
     }
 
     public function cron_schedules($schedules){
@@ -45,7 +52,98 @@ class HRIM_Core {
         wp_enqueue_style('hrim-front',HRIM_URL.'assets/css/front.css',['hrim-montserrat'],HRIM_VERSION);
         $accent = sanitize_hex_color(get_option('hrim_accent','#2563eb')) ?: '#2563eb';
         wp_add_inline_style('hrim-front', ':root{--hrim-accent:'.$accent.';}');
-        wp_enqueue_script('hrim-front',HRIM_URL.'assets/js/front.js',['jquery'],HRIM_VERSION,true);
+        wp_enqueue_script('hrim-front',HRIM_URL.'assets/js/front.js',['jquery'],HRIM_VERSION,false);
+        // v3.18.01: build Search / Excel / Filter controls while HTML is still parsing,
+        // instead of waiting for jQuery DOM-ready. This prevents the toolbar appearing
+        // seconds after the table on slower connections/devices.
+        $early_toolbar_js = <<<'JS'
+(function(){
+  'use strict';
+  function process(){
+    var panels=document.querySelectorAll('.hrim-content .hrim-panel.hrim-no-print');
+    panels.forEach(function(panel,index){
+      if(panel.getAttribute('data-hrim-filter-enhanced')==='1') return;
+      var form=panel.querySelector('form.hrim-filter');
+      if(!form) return;
+
+      var targetId='hrimFilterPanel'+index;
+      panel.setAttribute('data-hrim-filter-enhanced','1');
+      panel.classList.add('hrim-collapsible-filter-panel');
+      panel.classList.remove('is-open');
+      panel.setAttribute('aria-hidden','true');
+      panel.id=targetId;
+
+      var bar=document.createElement('div');
+      bar.className='hrim-filter-action-bar hrim-no-print hrim-early-toolbar';
+
+      var search=form.querySelector('input.hrim-table-search');
+      if(search){
+        var label=search.closest('label');
+        search.setAttribute('placeholder','');
+        search.setAttribute('aria-label','Search');
+        search.classList.add('hrim-header-search');
+        bar.appendChild(search);
+        if(label && label.parentNode) label.parentNode.removeChild(label);
+      }
+
+      var excel=form.querySelector('.hrim-export-csv');
+      if(excel){
+        excel.classList.add('hrim-icon-only-button');
+        excel.setAttribute('title','Download Excel');
+        excel.setAttribute('aria-label','Download Excel');
+        excel.innerHTML='<span class="dashicons dashicons-download" aria-hidden="true"></span>';
+        bar.appendChild(excel);
+      }
+
+      var toggle=document.createElement('button');
+      toggle.type='button';
+      toggle.className='hrim-filter-toggle';
+      toggle.setAttribute('aria-controls',targetId);
+      toggle.setAttribute('aria-expanded','false');
+      toggle.setAttribute('title','Show Filters');
+      toggle.setAttribute('aria-label','Show Filters');
+      toggle.innerHTML='<span class="dashicons dashicons-filter" aria-hidden="true"></span>';
+      bar.appendChild(toggle);
+
+      var resultPanel=panel.nextElementSibling;
+      while(resultPanel && !resultPanel.classList.contains('hrim-panel')) resultPanel=resultPanel.nextElementSibling;
+      if(resultPanel){
+        var head=resultPanel.querySelector(':scope > .hrim-panel-head');
+        if(!head){
+          head=document.createElement('div');
+          head.className='hrim-panel-head hrim-results-panel-head';
+          var countWrap=document.createElement('div');
+          var small=document.createElement('small');
+          var rows=resultPanel.querySelectorAll('table.hrim-table tbody > tr');
+          var count=0;
+          rows.forEach(function(row){ if(!row.classList.contains('hrim-section-detail-row') && !row.querySelector('td.hrim-empty')) count++; });
+          small.textContent=count+' records';
+          countWrap.appendChild(small);
+          head.appendChild(countWrap);
+          resultPanel.insertBefore(head,resultPanel.firstChild);
+        }
+        var right=head.querySelector(':scope > .hrim-toolbar, :scope > .hrim-panel-head-actions');
+        if(!right){
+          right=document.createElement('div');
+          right.className='hrim-toolbar hrim-panel-head-actions';
+          head.appendChild(right);
+        }
+        right.insertBefore(bar,right.firstChild);
+      }else if(panel.parentNode){
+        panel.parentNode.insertBefore(bar,panel);
+      }
+    });
+  }
+
+  // Start before the page body is parsed; MutationObserver moves controls as soon
+  // as each filter/results block arrives in the DOM.
+  var observer=new MutationObserver(process);
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  process();
+  document.addEventListener('DOMContentLoaded',function(){ process(); setTimeout(function(){observer.disconnect();},1200); });
+})();
+JS;
+        wp_add_inline_script('hrim-front',$early_toolbar_js,'before');
         wp_localize_script('hrim-front','HRIM',['ajax'=>admin_url('admin-ajax.php'),'nonce'=>wp_create_nonce('hrim_ajax')]);
     }
 
@@ -55,6 +153,22 @@ class HRIM_Core {
     }
 
     private function is_app_page(){ return is_page() && get_post_meta(get_queried_object_id(),'_hrim_app_page',true)==='1'; }
+    private function login_redirect_target($raw=''){
+        $fallback=$this->first_allowed_app_url();
+        $raw=is_string($raw)?trim(wp_unslash($raw)):'';
+        if($raw==='') return $fallback;
+        $candidate=esc_url_raw($raw);
+        if($candidate==='') return $fallback;
+        $validated=wp_validate_redirect($candidate,$fallback);
+        $login_url=$this->page_url('hotel-inspection-login');
+        if(untrailingslashit($validated)===untrailingslashit($login_url)) return $fallback;
+        return $validated;
+    }
+    private function current_request_url(){
+        $request_uri=isset($_SERVER['REQUEST_URI'])?wp_unslash((string)$_SERVER['REQUEST_URI']):'/';
+        if($request_uri==='' || $request_uri[0]!=='/') $request_uri='/';
+        return esc_url_raw(home_url($request_uri));
+    }
     public function disable_app_cache(){
         if(!$this->is_app_page()) return;
 
@@ -65,7 +179,8 @@ class HRIM_Core {
         $page_ids=(array)get_option('hrim_page_ids',[]);
         $login_id=!empty($page_ids['hotel-inspection-login'])?(int)$page_ids['hotel-inspection-login']:0;
         if(!is_user_logged_in() && (!$login_id || (int)$current_id!==$login_id)){
-            wp_safe_redirect($login_url);
+            $requested_url=$this->current_request_url();
+            wp_safe_redirect(add_query_arg('redirect_to',$requested_url,$login_url));
             exit;
         }
 
@@ -101,30 +216,27 @@ class HRIM_Core {
         return [
             'dashboard'=>['label'=>'Dashboard','slug'=>'hotel-inspection-dashboard'],
             'room_scores'=>['label'=>'Room Score','slug'=>'hotel-inspection-room-scores'],
-            'floor_scores'=>['label'=>'Floor Score','slug'=>'hotel-inspection-floor-scores'],
-            'inspect'=>['label'=>'Perform Inspection','slug'=>'hotel-inspection-inspection-form'],
-            'in_progress'=>['label'=>'Inspection In Progress','slug'=>'hotel-inspection-in-progress'],
-            'schedule_tasks_in_progress'=>['label'=>'Schedule Tasks In Progress','slug'=>'hotel-inspection-schedule-tasks-in-progress'],
-            'periodic_update_log'=>['label'=>'Schedule Tasks History','slug'=>'hotel-inspection-schedule-tasks-history'],
+            'inspect'=>['label'=>'Perform Inspection','slug'=>'perform-room-inspection'],
+            'in_progress'=>['label'=>'Inspection Started but Completed','slug'=>'hotel-inspection-in-progress'],
+            'schedule_tasks_in_progress'=>['label'=>'Due Periodic Tasks','slug'=>'hotel-inspection-schedule-tasks-in-progress'],
+            'periodic_update_log'=>['label'=>'Upcoming Periodic Tasks','slug'=>'hotel-inspection-schedule-tasks-history'],
             'history'=>['label'=>'Inspection History','slug'=>'hotel-inspection-history'],
-            'add_occupancy'=>['label'=>'Add Occupancy','slug'=>'hotel-inspection-add-occupancy'],
-            'update_office_count'=>['label'=>'Update Office Count','slug'=>'hotel-inspection-update-office-count'],
-            'occupancy'=>['label'=>'Occupancy Check','slug'=>'hotel-inspection-occupancy-check'],
-            'issues'=>['label'=>'Issues','slug'=>'hotel-inspection-issues'],
-            'pending_assign'=>['label'=>'Pending Assign Issue','slug'=>'hotel-inspection-pending-assign-issues'],
-            'pending_issues'=>['label'=>'Pending Issues','slug'=>'hotel-inspection-pending-issues'],
-            'resolved_issues'=>['label'=>'Issue Resolved','slug'=>'hotel-inspection-resolved-issues'],
-            'properties'=>['label'=>'Properties','slug'=>'hotel-inspection-properties'],
+            'add_occupancy'=>['label'=>'Security Occupancy Count','slug'=>'hotel-inspection-add-occupancy'],
+            'update_office_count'=>['label'=>'System Occupancy Count','slug'=>'hotel-inspection-update-office-count'],
+            'occupancy'=>['label'=>'System Vs Security','slug'=>'hotel-inspection-occupancy-check'],
+            'add_issue'=>['label'=>'Add Issue','slug'=>'hotel-inspection-add-issue'],
+            'pending_issues'=>['label'=>'Unresolved Issues','slug'=>'hotel-inspection-pending-issues'],
+            'pending_supervision'=>['label'=>'Pending Supervision','slug'=>'hotel-inspection-pending-supervision'],
+            'issues'=>['label'=>'Issue Master','slug'=>'hotel-inspection-issues'],
             'floors'=>['label'=>'Floors','slug'=>'hotel-inspection-floors'],
             'asset_types'=>['label'=>'Asset Types','slug'=>'hotel-inspection-asset-types'],
             'rooms'=>['label'=>'Assets','slug'=>'hotel-inspection-rooms'],
             'departments'=>['label'=>'Departments','slug'=>'hotel-inspection-departments'],
             'users'=>['label'=>'Users','slug'=>'hotel-inspection-users'],
-            'add_periodic_task'=>['label'=>'Add Periodic Tasks','slug'=>'hotel-inspection-add-periodic-task'],
-            'periodic_tasks'=>['label'=>'Periodic Tasks','slug'=>'hotel-inspection-periodic-tasks'],
+            'add_periodic_task'=>['label'=>'Add Periodic Task','slug'=>'hotel-inspection-add-periodic-task'],
+            'periodic_tasks'=>['label'=>'Periodic Task List','slug'=>'hotel-inspection-periodic-tasks'],
             'sections'=>['label'=>'Checklist Sections','slug'=>'hotel-inspection-checklist-sections'],
-            'sectionwise'=>['label'=>'Sectionwise Checklist','slug'=>'hotel-inspection-sectionwise-checklist'],
-            'templates'=>['label'=>'Templates','slug'=>'hotel-inspection-templates'],
+            'sectionwise'=>['label'=>'Sectionwise Checklists','slug'=>'hotel-inspection-sectionwise-checklist'],
             'reports'=>['label'=>'Reports','slug'=>'hotel-inspection-reports'],
             'learn'=>['label'=>'Learn','slug'=>'hotel-inspection-learn'],
             'communications'=>['label'=>'Communications','slug'=>'hotel-inspection-communications'],
@@ -134,17 +246,35 @@ class HRIM_Core {
     private function all_view_slugs(){
         return array_values(array_map(function($view){ return $view['slug']; },$this->configurable_view_map()));
     }
+    private function global_issue_view_slugs(){
+        // v3.19.15: The complete Issues section is organization-wide and cannot be hidden per user.
+        return [
+            'hotel-inspection-add-issue',
+            'hotel-inspection-issues',
+            'hotel-inspection-pending-issues',
+            'hotel-inspection-pending-supervision',
+            'hotel-inspection-resolved-issues',
+        ];
+    }
     private function get_user_allowed_view_slugs($user_id=0){
         $user_id=$user_id?:get_current_user_id();
         $all=$this->all_view_slugs();
         if(!$user_id) return $all;
         if(user_can($user_id,'manage_options')) return $all;
+        $mandatory=array_values(array_intersect($all,$this->global_issue_view_slugs()));
+        // Users created before View Access was introduced keep the historical default of all views.
+        if(!metadata_exists('user',$user_id,'hrim_allowed_views')) return $all;
         $raw=get_user_meta($user_id,'hrim_allowed_views',true);
-        if(empty($raw)) return $all;
         if(!is_array($raw)) $raw=(array)$raw;
         $raw=array_values(array_filter(array_map('sanitize_text_field',$raw)));
+        // Backward compatibility: older versions stored the Perform Inspection permission
+        // using the obsolete hotel-inspection-inspection-form slug, while the actual page
+        // has always been perform-room-inspection.
+        if(in_array('hotel-inspection-inspection-form',$raw,true) && !in_array('perform-room-inspection',$raw,true)){
+            $raw[]='perform-room-inspection';
+        }
         $allowed=array_values(array_intersect($all,$raw));
-        return $allowed ?: $all;
+        return array_values(array_unique(array_merge($allowed,$mandatory)));
     }
     private function get_user_allowed_nav_keys($user_id=0){
         $slugs=$this->get_user_allowed_view_slugs($user_id);
@@ -195,8 +325,8 @@ class HRIM_Core {
     }
 
     private function is_global_department_user($user_id=0){
-        $user_id=$user_id?:get_current_user_id();
-        return user_can($user_id,'manage_options') || user_can($user_id,'hrim_manage_all');
+        // v3.19.14: Department-based data restriction removed. All active application users see all departments/data.
+        return true;
     }
     private function user_department_ids($user_id=0){
         global $wpdb;
@@ -241,7 +371,7 @@ class HRIM_Core {
         $to=sanitize_text_field(wp_unslash($_GET['to']??''));
         return [$from,$to];
     }
-    private function excel_button($filename){ return '<button type="button" class="hrim-secondary hrim-export-csv hrim-icon-only-button" data-filename="'.esc_attr($filename).'" title="Download Excel" aria-label="Download Excel"><span class="dashicons dashicons-download" aria-hidden="true"></span></button>'; }
+    private function excel_button($filename,$table_id=''){ $target=$table_id!==''?' data-table="'.esc_attr($table_id).'"':''; return '<button type="button" class="hrim-secondary hrim-export-csv hrim-icon-only-button" data-filename="'.esc_attr($filename).'"'.$target.' title="Download Excel" aria-label="Download Excel"><span class="dashicons dashicons-download" aria-hidden="true"></span></button>'; }
 
     public function admin_menu(){ add_menu_page('Room Score','Room Score','manage_options','hrim-launch',[$this,'admin_launch'],'dashicons-clipboard',26); }
     public function admin_launch(){ echo '<div class="wrap"><h1>Room Score</h1><p>This plugin is frontend-first.</p><p><a class="button button-primary" href="'.esc_url($this->page_url('hotel-inspection-dashboard')).'">Open Application</a></p></div>'; }
@@ -259,15 +389,32 @@ class HRIM_Core {
         $counts['issues']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues");
         $counts['pending_assign']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues WHERE (assigned_to IS NULL OR assigned_to=0) AND status IN ('open','reopened')");
         $counts['pending_issues']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues WHERE assigned_to IS NOT NULL AND assigned_to>0 AND status IN ('assigned','in_progress','reopened','open')");
-        $counts['resolved_issues']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues WHERE status IN ('resolved','verified','closed')");
+        $counts['pending_supervision']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues WHERE status='resolved'");
+        $counts['resolved_issues']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_issues WHERE status IN ('verified','closed')");
         $counts['room_scores']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_rooms WHERE status='active'");
-        $counts['floor_scores']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_floors WHERE status='active'");
-        $counts['periodic_tasks']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_periodic_tasks WHERE status='active'");
+        // Sidebar badges must reflect the actual rows shown in each Periodic Task view.
+        // Periodic Task List shows only the latest generated instance per task, so tasks
+        // that exist in master data but have no schedule instance must not create a badge.
+        $counts['periodic_tasks']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_periodic_task_instances i INNER JOIN (SELECT task_id,MAX(due_date) latest_due FROM {$prefix}hrim_periodic_task_instances GROUP BY task_id) latest ON latest.task_id=i.task_id AND latest.latest_due=i.due_date");
+
+        // Upcoming Periodic Tasks is the update-log view; count the same records it displays.
+        $counts['periodic_update_log']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_periodic_task_update_log");
+
         $today=$this->ist_date('Y-m-d');
-        $counts['schedule_tasks_in_progress']=(int)$wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$prefix}hrim_periodic_task_instances WHERE due_date<=%s AND LOWER(TRIM(COALESCE(status,'due'))) NOT IN ('completed','verified')",
-            $today
-        ));
+        $due_scope_sql='';
+        $due_scope_args=[];
+        if(!$this->is_global_department_user()){
+            $due_department_ids=$this->user_department_ids();
+            if($due_department_ids){
+                $due_placeholders=implode(',',array_fill(0,count($due_department_ids),'%d'));
+                $due_scope_sql=" AND t.department_id IN ({$due_placeholders})";
+                $due_scope_args=$due_department_ids;
+            }else{
+                $due_scope_sql=' AND 1=0';
+            }
+        }
+        $due_sql="SELECT COUNT(*) FROM {$prefix}hrim_periodic_task_instances i JOIN {$prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified','cancelled','deleted'){$due_scope_sql}";
+        $counts['schedule_tasks_in_progress']=(int)$wpdb->get_var($wpdb->prepare($due_sql,array_merge([$today],$due_scope_args)));
 
         if($this->can_manage()){
             $counts['properties']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_hotels WHERE status='active'");
@@ -278,8 +425,7 @@ class HRIM_Core {
             $counts['departments']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_departments WHERE status='active'");
             $counts['sections']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_sections WHERE status='active'");
             $counts['sectionwise']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_questions WHERE is_library=1");
-            $counts['templates']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_templates WHERE status='active'");
-            $counts['users']=count($this->active_app_users(['administrator','hrim_manager','hrim_inspector','hrim_housekeeping']));
+            $counts['users']=count(get_users(['role__in'=>['administrator','hrim_owner','hrim_manager','hrim_supervisor','hrim_worker','hrim_inspector','hrim_housekeeping'],'number'=>-1,'fields'=>'ID','cache_results'=>false]));
             $counts['audit']=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$prefix}hrim_audit_log");
         }
         return $counts;
@@ -301,37 +447,30 @@ class HRIM_Core {
         $nav=[
             'dashboard'=>['Dashboard','hotel-inspection-dashboard','dashicons-dashboard'],
             'inspect'=>['Perform Inspection','perform-room-inspection','dashicons-yes-alt'],
-            'in_progress'=>['Inspection In Progress','hotel-inspection-in-progress','dashicons-update'],
-            'schedule_tasks_in_progress'=>['Schedule Tasks In Progress','hotel-inspection-schedule-tasks-in-progress','dashicons-calendar-alt'],
-            'periodic_update_log'=>['Schedule Tasks History','hotel-inspection-schedule-tasks-history','dashicons-backup'],
-            'periodic_tasks'=>['Periodic Tasks','hotel-inspection-periodic-tasks','dashicons-calendar-alt'],
-            'add_periodic_task'=>['Add Periodic Tasks','hotel-inspection-add-periodic-task','dashicons-plus-alt2'],
-            'add_occupancy'=>['Add Occupancy','hotel-inspection-add-occupancy','dashicons-plus-alt2'],
-            'update_office_count'=>['Update Office Count','hotel-inspection-update-office-count','dashicons-edit'],
-            'occupancy'=>['Occupancy Check','hotel-inspection-occupancy-check','dashicons-list-view'],
+            'in_progress'=>['Inspection Started but Completed','hotel-inspection-in-progress','dashicons-update'],
+            'schedule_tasks_in_progress'=>['Due Periodic Tasks','hotel-inspection-schedule-tasks-in-progress','dashicons-calendar-alt'],
+            'periodic_update_log'=>['Upcoming Periodic Tasks','hotel-inspection-schedule-tasks-history','dashicons-backup'],
+            'periodic_tasks'=>['Periodic Task List','hotel-inspection-periodic-tasks','dashicons-calendar-alt'],
+            'add_periodic_task'=>['Add Periodic Task','hotel-inspection-add-periodic-task','dashicons-plus-alt2'],
+            'add_occupancy'=>['Security Occupancy Count','hotel-inspection-add-occupancy','dashicons-plus-alt2'],
+            'update_office_count'=>['System Occupancy Count','hotel-inspection-update-office-count','dashicons-edit'],
+            'occupancy'=>['System Vs Security','hotel-inspection-occupancy-check','dashicons-list-view'],
             'history'=>['Inspection History','hotel-inspection-history','dashicons-clipboard'],
-            'issues'=>['Issues','hotel-inspection-issues','dashicons-warning'],
-            'pending_assign'=>['Pending Assign Issue','hotel-inspection-pending-assign-issues','dashicons-admin-users'],
-            'pending_issues'=>['Pending Issues','hotel-inspection-pending-issues','dashicons-clock'],
-            'resolved_issues'=>['Issue Resolved','hotel-inspection-resolved-issues','dashicons-yes-alt'],
-            'reports'=>['Reports','hotel-inspection-reports','dashicons-chart-bar'],
+            'add_issue'=>['Add Issue','hotel-inspection-add-issue','dashicons-plus-alt2'],
+            'pending_issues'=>['Unresolved Issues','hotel-inspection-pending-issues','dashicons-clock'],
+            'pending_supervision'=>['Pending Supervision','hotel-inspection-pending-supervision','dashicons-visibility'],
+            'issues'=>['Issue Master','hotel-inspection-issues','dashicons-warning'],
             'learn'=>['Learn','hotel-inspection-learn','dashicons-welcome-learn-more'],
         ];
         if(get_option('hrim_show_room_score','1')==='1'){
             $nav = array_slice($nav,0,1,true) + ['room_scores'=>['Room Score','hotel-inspection-room-scores','dashicons-star-filled']] + array_slice($nav,1,null,true);
         }
-        if(get_option('hrim_show_floor_score','1')==='1'){
-            $offset = isset($nav['room_scores']) ? 2 : 1;
-            $nav = array_slice($nav,0,$offset,true) + ['floor_scores'=>['Floor Score','hotel-inspection-floor-scores','dashicons-chart-area']] + array_slice($nav,$offset,null,true);
-        }
         if($this->can_manage()){
-            $nav['properties']=['Properties','hotel-inspection-properties','dashicons-building'];
             $nav['floors']=['Floors','hotel-inspection-floors','dashicons-editor-ol'];
             $nav['asset_types']=['Asset Types','hotel-inspection-asset-types','dashicons-screenoptions'];
             $nav['rooms']=['Assets','hotel-inspection-rooms','dashicons-admin-home'];
             $nav['sections']=['Checklist Sections','hotel-inspection-checklist-sections','dashicons-editor-ul'];
-            $nav['sectionwise']=['Sectionwise Checklist','hotel-inspection-sectionwise-checklist','dashicons-list-view'];
-            $nav['templates']=['Templates','hotel-inspection-templates','dashicons-list-view'];
+            $nav['sectionwise']=['Sectionwise Checklists','hotel-inspection-sectionwise-checklist','dashicons-list-view'];
             $nav['departments']=['Departments','hotel-inspection-departments','dashicons-networking'];
             $nav['users']=['Users','hotel-inspection-users','dashicons-groups'];
             $nav['communications']=['Communications','hotel-inspection-communications','dashicons-format-chat'];
@@ -342,7 +481,7 @@ class HRIM_Core {
             'inspection'=>[
                 'label'=>'Inspection',
                 'icon'=>'dashicons-clipboard',
-                'items'=>['inspect','in_progress','schedule_tasks_in_progress','periodic_update_log','history'],
+                'items'=>['inspect','in_progress','history'],
             ],
             'occupancy_group'=>[
                 'label'=>'Occupancy',
@@ -352,32 +491,38 @@ class HRIM_Core {
             'issue_group'=>[
                 'label'=>'Issues',
                 'icon'=>'dashicons-warning',
-                'items'=>['issues','pending_assign','pending_issues','resolved_issues'],
+                'items'=>['add_issue','pending_issues','pending_supervision','issues'],
             ],
         ];
         if($this->can_manage()){
             $nav_groups['masters']=[
                 'label'=>'Masters',
                 'icon'=>'dashicons-portfolio',
-                'items'=>['properties','floors','asset_types','categories','rooms','departments','users'],
+                'items'=>['floors','asset_types','categories','rooms','departments','users'],
             ];
         }
         // Keep Periodic Tasks directly below the Masters section in the sidebar.
         $nav_groups['periodic_group']=[
-            'label'=>'Periodic Tasks',
+            'label'=>'Periodic Task',
             'icon'=>'dashicons-calendar-alt',
-            'items'=>['add_periodic_task','periodic_tasks'],
+            'items'=>['add_periodic_task','periodic_tasks','periodic_update_log','schedule_tasks_in_progress'],
         ];
         if($this->can_manage()){
             $nav_groups['section_group']=[
                 'label'=>'Sections',
                 'icon'=>'dashicons-editor-ul',
-                'items'=>['sections','sectionwise','templates'],
+                'items'=>['sections','sectionwise'],
             ];
         }
         $nav_counts=$this->sidebar_counts();
+        // v3.18.08: server-rendered desktop sidebar toggle. This avoids any dependency on JavaScript.
+        $sidebar_hidden = isset($_GET['hrim_sidebar']) && sanitize_key(wp_unslash($_GET['hrim_sidebar'])) === 'hide';
+        $current_request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
+        $current_url = home_url($current_request);
+        $current_url = remove_query_arg('hrim_sidebar', $current_url);
+        $sidebar_toggle_url = add_query_arg('hrim_sidebar', $sidebar_hidden ? 'show' : 'hide', $current_url);
         ob_start(); ?>
-        <div class="hrim-app-shell">
+        <div class="hrim-app-shell<?php echo $sidebar_hidden?' hrim-sidebar-collapsed':''; ?>">
           <div id="hrimGlobalSpinner" class="hrim-global-spinner" aria-hidden="true"><div class="hrim-spinner-ring" role="status" aria-label="Loading"></div><span>Loading...</span></div>
           <aside class="hrim-sidebar" id="hrimSidebar"><button type="button" class="hrim-sidebar-mobile-close" aria-label="Close menu" title="Close menu"><span class="dashicons dashicons-no-alt" aria-hidden="true"></span></button><div class="hrim-brand"><img class="hrim-brand-logo" src="https://res.cloudinary.com/qmkv5rd2/image/upload/v1784719520/Room_Score_cs4m3f.png" alt="Room Score"></div>
           <nav class="hrim-sidebar-nav">
@@ -399,7 +544,6 @@ class HRIM_Core {
             };
             $render_link('dashboard');
             $render_link('room_scores');
-            $render_link('floor_scores');
             foreach($nav_groups as $group_key=>$group):
                 $group_items=array_values(array_filter($group['items'],function($item_key) use ($allowed_nav_keys){ return in_array($item_key,$allowed_nav_keys,true); }));
                 if(!$group_items) continue;
@@ -419,7 +563,6 @@ class HRIM_Core {
                 </div>
               </div>
             <?php endforeach;
-            $render_link('reports');
             $render_link('learn');
             if($this->can_manage()) {
                 $render_link('communications');
@@ -429,12 +572,38 @@ class HRIM_Core {
           </nav>
           <div class="hrim-sidebar-user"><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><div><strong><?php echo esc_html($u->display_name); ?></strong><a href="<?php echo esc_url(wp_logout_url($this->page_url('hotel-inspection-login'))); ?>">Logout</a></div></div>
           </aside>
-          <main class="hrim-main"><header class="hrim-topbar"><button class="hrim-menu-toggle" type="button" aria-label="Menu">☰</button><button type="button" class="hrim-sidebar-collapse-toggle" id="hrimSidebarCollapseToggle" aria-expanded="true" title="Hide Menu" aria-label="Hide Menu"><span class="dashicons dashicons-arrow-left-alt2" aria-hidden="true"></span></button><div><h1><?php echo esc_html($title); ?></h1></div></header><section class="hrim-content"><?php if(!empty($_GET['hrim_saved'])): ?><div class="hrim-alert success"><?php echo esc_html(wp_unslash($_GET['hrim_message'] ?? 'Saved successfully.')); ?></div><?php endif; ?><?php if(!empty($_GET['hrim_error'])): ?><div class="hrim-alert error"><?php echo esc_html(wp_unslash($_GET['hrim_error'])); ?></div><?php endif; ?><?php echo $content; ?></section></main>
+          <?php $property_logo_id=absint(get_option('hrim_property_logo_id',0)); $property_logo_url=$property_logo_id?wp_get_attachment_image_url($property_logo_id,'medium'):''; ?>
+          <main class="hrim-main"><style id="hrim-mobile-logo-critical">@media(max-width:760px){html body .hrim-app-shell .hrim-topbar img.hrim-property-view-logo,html body .hrim-app-shell .hrim-topbar img.hrim-property-view-logo-right{width:70px!important;max-width:70px!important;height:28px!important;max-height:28px!important;object-fit:contain!important;object-position:right center!important;flex:0 0 70px!important;margin-left:auto!important;margin-right:0!important}.hrim-app-shell .hrim-topbar{gap:6px!important}.hrim-app-shell .hrim-topbar .hrim-topbar-title-wrap{min-width:0!important;flex:1 1 auto!important}.hrim-app-shell .hrim-topbar .hrim-topbar-title-wrap h1{font-size:15px!important;line-height:1.1!important}}</style><header class="hrim-topbar"><button class="hrim-menu-toggle" type="button" aria-label="Menu">☰</button><div class="hrim-topbar-left"><a class="hrim-sidebar-collapse-toggle hrim-topbar-sidebar-toggle" data-no-spinner="1" href="<?php echo esc_url($sidebar_toggle_url); ?>" aria-expanded="<?php echo $sidebar_hidden?'false':'true'; ?>" title="<?php echo $sidebar_hidden?'Show Menu':'Hide Menu'; ?>" aria-label="<?php echo $sidebar_hidden?'Show Menu':'Hide Menu'; ?>"><span class="dashicons <?php echo $sidebar_hidden?'dashicons-arrow-right-alt2':'dashicons-arrow-left-alt2'; ?>" aria-hidden="true"></span></a><div class="hrim-topbar-title-wrap"><h1><?php echo esc_html($title); ?></h1></div></div><?php if($property_logo_url): ?><img class="hrim-property-view-logo hrim-property-view-logo-right" style="margin-left:auto!important;margin-right:0!important;" src="<?php echo esc_url($property_logo_url); ?>" alt="Property Logo"><?php endif; ?></header><section class="hrim-content hrim-view-<?php echo esc_attr($active); ?>"><?php if(!empty($_GET['hrim_saved'])): ?><div class="hrim-alert success"><?php echo esc_html(wp_unslash($_GET['hrim_message'] ?? 'Saved successfully.')); ?></div><?php endif; ?><?php if(!empty($_GET['hrim_error'])): ?><div class="hrim-alert error"><?php echo esc_html(wp_unslash($_GET['hrim_error'])); ?></div><?php endif; ?><?php echo $content; ?></section></main>
         </div><?php return ob_get_clean();
     }
 
+    public function redirect_core_login_screen(){
+        // The branded form still POSTs to wp-login.php so WordPress can authenticate.
+        // Only direct browser GET requests are redirected away from the WordPress login UI.
+        if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))!=='GET') return;
+        if(is_user_logged_in()) return;
+        $action=isset($_REQUEST['action'])?sanitize_key(wp_unslash($_REQUEST['action'])):'login';
+        // Password-reset/register screens are intentionally not exposed from this application.
+        if(in_array($action,['login','lostpassword','retrievepassword','resetpass','rp','register'],true)){
+            $login_url=$this->page_url('hotel-inspection-login');
+            $redirect_to=isset($_REQUEST['redirect_to'])?$this->login_redirect_target($_REQUEST['redirect_to']):'';
+            if($redirect_to!=='') $login_url=add_query_arg('redirect_to',$redirect_to,$login_url);
+            wp_safe_redirect($login_url);
+            exit;
+        }
+    }
+
+    public function redirect_failed_login(){
+        if(headers_sent()) return;
+        $args=['login'=>'failed'];
+        if(!empty($_POST['redirect_to'])) $args['redirect_to']=$this->login_redirect_target($_POST['redirect_to']);
+        wp_safe_redirect(add_query_arg($args,$this->page_url('hotel-inspection-login')));
+        exit;
+    }
+
     public function login_shortcode(){
-        if(is_user_logged_in()) return '<script>location.href='.wp_json_encode($this->first_allowed_app_url()).';</script>';
+        $redirect_to=$this->login_redirect_target($_GET['redirect_to']??'');
+        if(is_user_logged_in()) return '<script>location.href='.wp_json_encode($redirect_to).';</script>';
         $error=''; if(isset($_GET['login'])&&$_GET['login']==='failed') $error='<div class="hrim-alert error">Invalid username or password.</div>'; if(isset($_GET['inactive'])) $error='<div class="hrim-alert error">Your application access is inactive. Please contact the administrator.</div>'; 
         ob_start(); ?>
         <div class="hrim-login-page">
@@ -447,8 +616,8 @@ class HRIM_Core {
               <form method="post" action="<?php echo esc_url(wp_login_url()); ?>">
                 <label class="hrim-login-field"><span>Username or Email</span><span class="hrim-login-input-wrap"><i class="dashicons dashicons-admin-users"></i><input type="text" name="log" autocomplete="username" placeholder="Enter your username or email" required autofocus></span></label>
                 <label class="hrim-login-field"><span>Password</span><span class="hrim-login-input-wrap"><i class="dashicons dashicons-lock"></i><input type="password" name="pwd" autocomplete="current-password" placeholder="Enter your password" required></span></label>
-                <div class="hrim-login-options"><label class="hrim-login-remember"><input type="checkbox" name="rememberme" value="forever"><span>Remember me</span></label><a href="<?php echo esc_url(wp_lostpassword_url()); ?>">Forgot password?</a></div>
-                <input type="hidden" name="redirect_to" value="<?php echo esc_attr($this->page_url('hotel-inspection-dashboard')); ?>">
+                <div class="hrim-login-options"><label class="hrim-login-remember"><input type="checkbox" name="rememberme" value="forever"><span>Remember me</span></label></div>
+                <input type="hidden" name="redirect_to" value="<?php echo esc_attr($redirect_to); ?>">
                 <button class="hrim-primary hrim-login-submit" type="submit"><span>Sign In</span><i class="dashicons dashicons-arrow-right-alt"></i></button>
               </form>
               
@@ -461,9 +630,8 @@ class HRIM_Core {
         global $wpdb;
         static $cache = null;
         if ($cache !== null) return $cache;
-        $rows = $wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_hotels WHERE status='active' ORDER BY id ASC LIMIT 2");
-        $cache = (count($rows) === 1) ? $rows[0] : false;
-        return $cache;
+        $cache = $wpdb->get_row("SELECT id,name FROM {$wpdb->prefix}hrim_hotels ORDER BY (status='active') DESC,id ASC LIMIT 1");
+        return $cache ?: false;
     }
 
     private function effective_property_id($posted_id=0){
@@ -486,14 +654,200 @@ class HRIM_Core {
         ];
     }
 
+
+    public function invalidate_storage_cache(){
+        delete_transient('hrim_storage_usage_v2');
+    }
+
+    private function optimize_roomscore_image_attachment($attachment_id){
+        $attachment_id=absint($attachment_id);
+        if(!$attachment_id || strpos((string)get_post_mime_type($attachment_id),'image/')!==0) return $attachment_id;
+        $mime=(string)get_post_mime_type($attachment_id);
+        if($mime==='image/gif') {
+            update_post_meta($attachment_id,'_hrim_media_kind','photo');
+            $this->invalidate_storage_cache();
+            return $attachment_id; // preserve animated GIFs unchanged
+        }
+        $file=get_attached_file($attachment_id);
+        if(!$file || !is_file($file)) return $attachment_id;
+        require_once ABSPATH.'wp-admin/includes/image.php';
+        $editor=wp_get_image_editor($file);
+        if(is_wp_error($editor)) return $attachment_id;
+        $size=$editor->get_size();
+        $w=absint($size['width']??0); $h=absint($size['height']??0);
+        $needs_resize=max($w,$h)>1600;
+        $lossy=in_array($mime,['image/jpeg','image/webp'],true);
+        if(!$needs_resize && !$lossy){
+            update_post_meta($attachment_id,'_hrim_media_kind','photo');
+            $this->invalidate_storage_cache();
+            return $attachment_id;
+        }
+        if($needs_resize){
+            $result=$editor->resize(1600,1600,false);
+            if(is_wp_error($result)) return $attachment_id;
+        }
+        if($lossy) $editor->set_quality(80);
+        $saved=$editor->save($file,$mime);
+        if(!is_wp_error($saved)){
+            /* Some image editors may save to a derived filename. Keep WP's attached file stable. */
+            if(!empty($saved['path']) && $saved['path']!==$file && is_file($saved['path'])){
+                @copy($saved['path'],$file);
+                @unlink($saved['path']);
+            }
+            $old=wp_get_attachment_metadata($attachment_id);
+            if(is_array($old) && !empty($old['sizes'])){
+                $dir=dirname($file);
+                foreach($old['sizes'] as $entry){
+                    $name=(string)($entry['file']??'');
+                    if($name){
+                        $derived=$dir.DIRECTORY_SEPARATOR.basename($name);
+                        if($derived!==$file && is_file($derived)) @unlink($derived);
+                    }
+                }
+            }
+            $meta=wp_generate_attachment_metadata($attachment_id,$file);
+            if(is_array($meta)) wp_update_attachment_metadata($attachment_id,$meta);
+            update_post_meta($attachment_id,'_hrim_optimized','1');
+            update_post_meta($attachment_id,'_hrim_max_dimension','1600');
+            update_post_meta($attachment_id,'_hrim_image_quality','80');
+        }
+        update_post_meta($attachment_id,'_hrim_media_kind','photo');
+        $this->invalidate_storage_cache();
+        return $attachment_id;
+    }
+
+    private function mark_roomscore_video_attachment($attachment_id){
+        $attachment_id=absint($attachment_id);
+        if($attachment_id){
+            update_post_meta($attachment_id,'_hrim_media_kind','video');
+            $this->invalidate_storage_cache();
+        }
+        return $attachment_id;
+    }
+
+    private function attachment_disk_bytes($attachment_id){
+        $attachment_id=absint($attachment_id);
+        if(!$attachment_id) return 0;
+        $file=get_attached_file($attachment_id);
+        if(!$file) return 0;
+        $files=[];
+        if(is_file($file)) $files[wp_normalize_path($file)]=1;
+        $meta=wp_get_attachment_metadata($attachment_id);
+        $dir=dirname($file);
+        if(is_array($meta)){
+            foreach((array)($meta['sizes']??[]) as $entry){
+                $name=(string)($entry['file']??'');
+                if($name){
+                    $path=$dir.DIRECTORY_SEPARATOR.basename($name);
+                    if(is_file($path)) $files[wp_normalize_path($path)]=1;
+                }
+            }
+            if(!empty($meta['original_image'])){
+                $path=$dir.DIRECTORY_SEPARATOR.basename((string)$meta['original_image']);
+                if(is_file($path)) $files[wp_normalize_path($path)]=1;
+            }
+        }
+        $bytes=0;
+        foreach(array_keys($files) as $path){
+            $s=@filesize($path);
+            if($s!==false) $bytes+=(int)$s;
+        }
+        return $bytes;
+    }
+
+    private function roomscore_media_ids(){
+        global $wpdb;
+        $photo=[]; $video=[];
+        $add=function($raw,&$target){
+            foreach($this->normalize_attachment_ids($raw) as $id) $target[$id]=1;
+        };
+
+        foreach($wpdb->get_col("SELECT attachment_ids FROM {$wpdb->prefix}hrim_answers WHERE attachment_ids IS NOT NULL AND attachment_ids<>''") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT video_attachment_ids FROM {$wpdb->prefix}hrim_answers WHERE video_attachment_ids IS NOT NULL AND video_attachment_ids<>''") as $v) $add($v,$video);
+        foreach($wpdb->get_col("SELECT attachment_ids FROM {$wpdb->prefix}hrim_inspections WHERE attachment_ids IS NOT NULL AND attachment_ids<>''") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT attachment_ids FROM {$wpdb->prefix}hrim_issues WHERE attachment_ids IS NOT NULL AND attachment_ids<>''") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT resolution_attachment_ids FROM {$wpdb->prefix}hrim_issues WHERE resolution_attachment_ids IS NOT NULL AND resolution_attachment_ids<>''") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT attachment_ids FROM {$wpdb->prefix}hrim_issue_updates WHERE attachment_ids IS NOT NULL AND attachment_ids<>''") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT photo_attachment_id FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE photo_attachment_id IS NOT NULL AND photo_attachment_id>0") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT photo_attachment_id FROM {$wpdb->prefix}hrim_periodic_task_update_log WHERE photo_attachment_id IS NOT NULL AND photo_attachment_id>0") as $v) $add($v,$photo);
+        foreach($wpdb->get_col("SELECT photo_attachment_id FROM {$wpdb->prefix}hrim_periodic_task_answers WHERE photo_attachment_id IS NOT NULL AND photo_attachment_id>0") as $v) $add($v,$photo);
+
+        /* Include RoomScore uploads that may not yet have been saved to an inspection. */
+        $marked=$wpdb->get_results("SELECT post_id,meta_value FROM {$wpdb->postmeta} WHERE meta_key='_hrim_media_kind' AND meta_value IN ('photo','video')");
+        foreach($marked as $m){
+            $id=absint($m->post_id);
+            if(!$id) continue;
+            if($m->meta_value==='video') $video[$id]=1; else $photo[$id]=1;
+        }
+
+        /* MIME type is authoritative if an ID was found in an older/general attachment field. */
+        $all=array_unique(array_merge(array_keys($photo),array_keys($video)));
+        $p=[]; $v=[];
+        foreach($all as $id){
+            $mime=(string)get_post_mime_type($id);
+            if(strpos($mime,'video/')===0) $v[$id]=1;
+            elseif(strpos($mime,'image/')===0) $p[$id]=1;
+        }
+        return ['photo_ids'=>array_keys($p),'video_ids'=>array_keys($v)];
+    }
+
+    private function calculate_roomscore_storage_usage(){
+        global $wpdb;
+        $ids=$this->roomscore_media_ids();
+        $photo_bytes=0; $video_bytes=0;
+        foreach($ids['photo_ids'] as $id) $photo_bytes+=$this->attachment_disk_bytes($id);
+        foreach($ids['video_ids'] as $id) $video_bytes+=$this->attachment_disk_bytes($id);
+
+        $db_bytes=0;
+        $like=$wpdb->esc_like($wpdb->prefix.'hrim_').'%';
+        $db_name=defined('DB_NAME')?DB_NAME:'';
+        if($db_name){
+            $value=$wpdb->get_var($wpdb->prepare(
+                "SELECT COALESCE(SUM(DATA_LENGTH+INDEX_LENGTH),0) FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME LIKE %s",
+                $db_name,$like
+            ));
+            if(is_numeric($value)) $db_bytes=(int)$value;
+        }
+        $stats=[
+            'photo_bytes'=>$photo_bytes,
+            'video_bytes'=>$video_bytes,
+            'database_bytes'=>$db_bytes,
+            'total_bytes'=>$photo_bytes+$video_bytes+$db_bytes,
+            'photo_count'=>count($ids['photo_ids']),
+            'video_count'=>count($ids['video_ids']),
+            'calculated_at'=>$this->ist_now_mysql(),
+        ];
+        set_transient('hrim_storage_usage_v2',$stats,6*HOUR_IN_SECONDS);
+        return $stats;
+    }
+
+    private function roomscore_storage_usage($refresh=false){
+        if($refresh) delete_transient('hrim_storage_usage_v2');
+        $cached=get_transient('hrim_storage_usage_v2');
+        return is_array($cached)?$cached:$this->calculate_roomscore_storage_usage();
+    }
+
+    public function refresh_storage_usage(){
+        $this->guard_manage('hrim_refresh_storage_usage');
+        $this->roomscore_storage_usage(true);
+        $this->back('hotel-inspection-dashboard','saved','Storage usage refreshed.');
+    }
+
     public function dashboard_shortcode(){
         global $wpdb;
         $s=$this->stats();
         $recent=$wpdb->get_results("SELECT i.*,r.room_no,f.name floor_name,h.name hotel_name,u.display_name inspector FROM {$wpdb->prefix}hrim_inspections i LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=i.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=i.hotel_id LEFT JOIN {$wpdb->users} u ON u.ID=i.inspector_id WHERE i.status<>'in_progress' ORDER BY i.id DESC LIMIT 8");
         $in_progress_where=$this->can_manage()?"i.status='in_progress'":"i.status='in_progress' AND i.inspector_id=".get_current_user_id();
         $in_progress_rows=$wpdb->get_results("SELECT i.draft_batch_id,MIN(i.started_at) started_at,MAX(i.last_saved_at) last_saved_at,MAX(i.room_id) room_id,MAX(i.inspector_id) inspector_id,r.room_no,f.name floor_name,u.display_name inspector FROM {$wpdb->prefix}hrim_inspections i LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=i.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=i.floor_id LEFT JOIN {$wpdb->users} u ON u.ID=i.inspector_id WHERE {$in_progress_where} AND i.draft_batch_id IS NOT NULL AND i.draft_batch_id<>'' GROUP BY i.draft_batch_id ORDER BY last_saved_at DESC LIMIT 8");
-        $pending_assign=$this->get_issue_rows("(x.assigned_to IS NULL OR x.assigned_to=0) AND x.status IN ('open','reopened')",[],8);
-        $pending=$this->get_issue_rows("x.status IN ('assigned','in_progress','reopened') OR (x.status='open' AND x.assigned_to IS NOT NULL)",[],8);
+        // Dashboard KPI must match the Inspection Started but Completed view exactly.
+        $s['in_progress']=(int)$wpdb->get_var("SELECT COUNT(DISTINCT i.draft_batch_id) FROM {$wpdb->prefix}hrim_inspections i WHERE {$in_progress_where} AND i.draft_batch_id IS NOT NULL AND i.draft_batch_id<>''");
+        $pending_assign_where="(x.assigned_to IS NULL OR x.assigned_to=0) AND x.status IN ('open','reopened')";
+        $pending_where="x.assigned_to IS NOT NULL AND x.assigned_to>0 AND x.status IN ('assigned','in_progress','reopened','open')";
+        $pending_assign=$this->get_issue_rows($pending_assign_where,[],8);
+        $pending=$this->get_issue_rows($pending_where,[],8);
+        // Keep Dashboard KPI counts identical to the corresponding issue views, including department/user scope.
+        $s['pending_assign']=count($this->get_issue_rows($pending_assign_where,[],0));
+        $s['open']=count($this->get_issue_rows($pending_where,[],0));
         $today_ist=$this->ist_date('Y-m-d');
         $delay=$this->get_issue_rows("x.status NOT IN ('resolved','verified','closed') AND x.due_date IS NOT NULL AND x.due_date<>'' AND DATE(x.due_date)<%s",[$today_ist],8);
         $resolved=$this->get_issue_rows("x.status IN ('resolved','verified','closed') AND DATE(COALESCE(x.resolved_at,x.created_at))=%s",[$today_ist],8);
@@ -510,16 +864,22 @@ class HRIM_Core {
                 $schedule_scope_sql=' AND 1=0';
             }
         }
-        $schedule_sql="SELECT i.*,t.task_name,d.name department_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=t.department_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified'){$schedule_scope_sql} ORDER BY i.due_date ASC,i.id ASC LIMIT 8";
+        $schedule_sql="SELECT i.*,t.task_name,d.name department_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=t.department_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified','cancelled','deleted'){$schedule_scope_sql} ORDER BY i.due_date ASC,i.id ASC LIMIT 8";
         $schedule_args=array_merge([$today_ist],$schedule_scope_args);
         $schedule_rows=$wpdb->get_results($wpdb->prepare($schedule_sql,$schedule_args));
-        $schedule_count_sql="SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified'){$schedule_scope_sql}";
+        $schedule_count_sql="SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified','cancelled','deleted'){$schedule_scope_sql}";
         $schedule_count=(int)$wpdb->get_var($wpdb->prepare($schedule_count_sql,$schedule_args));
         $department_rows=$this->active_departments();
         if(!$this->is_global_department_user()){
             $allowed=$this->user_department_ids();
             $department_rows=array_values(array_filter($department_rows,function($d) use($allowed){ return in_array((int)$d->id,$allowed,true); }));
         }
+        // Dashboard Occupancy: latest 7 System Vs Security records.
+        $occupancy_sessions=$wpdb->prefix.'hrim_occupancy_checks';
+        $occupancy_entries=$wpdb->prefix.'hrim_occupancy_check_rooms';
+        $occupancy_from=date('Y-m-d',strtotime($today_ist.' -6 days'));
+        $occupancy_rows=$wpdb->get_results($wpdb->prepare("SELECT c.id,c.check_date,c.system_count,(SELECT COUNT(*) FROM {$occupancy_entries} e INNER JOIN {$wpdb->prefix}hrim_rooms r1 ON r1.id=e.room_id INNER JOIN {$wpdb->prefix}hrim_asset_types at1 ON at1.id=r1.asset_type_id WHERE e.occupancy_check_id=c.id AND e.status='yes' AND LOWER(TRIM(at1.name))='room') security_count FROM {$occupancy_sessions} c WHERE c.check_date BETWEEN %s AND %s ORDER BY c.check_date DESC,c.id DESC LIMIT 7",$occupancy_from,$today_ist));
+
         foreach($department_rows as $department){
             $user_sql=$this->is_global_department_user()?'':$wpdb->prepare(" AND x.assigned_to=%d",get_current_user_id());
             $department->pending_assign=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues x WHERE x.department_id=%d AND (x.assigned_to IS NULL OR x.assigned_to=0) AND x.status IN ('open','reopened')".$user_sql,$department->id));
@@ -530,31 +890,88 @@ class HRIM_Core {
         ob_start(); ?>
         <?php
         $kpis=[
-            ['in_progress','Total Inspection In Progress','update',$this->page_url('hotel-inspection-in-progress')],
-            ['pending_assign','Pending Assign Issues','admin-users',$this->page_url('hotel-inspection-pending-assign-issues')],
-            ['pending_inspections','Pending Inspections','clock',$this->page_url('hotel-inspection-pending-issues')],
-            ['open','Open Issues','warning',$this->page_url('hotel-inspection-issues')],
-            ['delayed','Delayed Issues','clock',add_query_arg('delayed','1',$this->page_url('hotel-inspection-pending-issues'))],
-            ['schedule_tasks','Schedule Tasks In Progress','calendar-alt',$this->page_url('hotel-inspection-schedule-tasks-in-progress')],
+            ['in_progress','Inspection Started but not completed','update',$this->page_url('hotel-inspection-in-progress')],
+            ['pending_assign','Unassigned Issues','admin-users',$this->page_url('hotel-inspection-pending-assign-issues')],
+            ['open','Unresolved Issues','warning',$this->page_url('hotel-inspection-pending-issues')],
+            ['schedule_tasks','Due Periodic Tasks','calendar-alt',$this->page_url('hotel-inspection-schedule-tasks-in-progress')],
         ];
         $s['schedule_tasks']=$schedule_count;
+        $storage=$this->can_manage()?$this->roomscore_storage_usage():null;
         ?>
         <div class="hrim-kpis"><?php foreach($kpis as $x): $extra_class=$x[0]==='schedule_tasks'?' hrim-kpi-schedule-tasks':''; ?><a class="hrim-kpi hrim-kpi-link<?php echo esc_attr($extra_class); ?>" href="<?php echo esc_url($x[3]); ?>" aria-label="<?php echo esc_attr($x[1]); ?>"><small><?php echo esc_html($x[1]); ?></small><strong><?php echo esc_html($s[$x[0]]); ?></strong></a><?php endforeach; ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-department-summary"><div class="hrim-panel-head"><h2>Department-wise Issue Count</h2><?php echo $this->excel_button('dashboard-department-count'); ?></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Department</th><th>Pending Assign</th><th>Pending</th><th>Delayed</th><th>Resolved Today</th></tr></thead><tbody><?php foreach($department_rows as $department): ?><tr><td><strong><?php echo esc_html($department->name); ?></strong></td><td><?php echo esc_html($department->pending_assign); ?></td><td><?php echo esc_html($department->pending); ?></td><td><?php echo esc_html($department->delayed); ?></td><td><?php echo esc_html($department->resolved); ?></td></tr><?php endforeach; ?><?php if(!$department_rows): ?><tr><td colspan="5" class="hrim-empty">No departments available.</td></tr><?php endif; ?></tbody></table></div></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-schedule-tasks"><div class="hrim-panel-head"><h2>Schedule Tasks In Progress</h2><?php echo $this->excel_button('dashboard-schedule-tasks-in-progress'); ?></div><?php echo $this->dashboard_schedule_tasks_table($schedule_rows); ?></div>
+        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-occupancy"><div class="hrim-panel-head"><h2>Occupancy</h2><?php echo $this->excel_button('dashboard-occupancy'); ?></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-dashboard-occupancy-table"><colgroup><col class="hrim-occ-col-date"><col class="hrim-occ-col-security"><col class="hrim-occ-col-system"></colgroup><thead><tr><th>Date</th><th>Security</th><th>System</th></tr></thead><tbody><?php foreach($occupancy_rows as $occupancy): ?><tr><td><?php echo esc_html($this->ist_date('d/m/y',$occupancy->check_date)); ?></td><td><?php echo esc_html((int)$occupancy->security_count); ?></td><td><?php echo ($occupancy->system_count===null || $occupancy->system_count==='')?'—':esc_html((int)$occupancy->system_count); ?></td></tr><?php endforeach; ?><?php if(!$occupancy_rows): ?><tr><td colspan="3" class="hrim-empty">No occupancy records found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php $department_issue_rows=array_values(array_filter($department_rows,function($department){ return ((int)$department->pending>0 || (int)$department->delayed>0 || (int)$department->resolved>0); })); ?>
+        <div class="hrim-panel hrim-dashboard-panel hrim-department-summary"><div class="hrim-panel-head"><h2>Department-wise Issue Count</h2><?php echo $this->excel_button('dashboard-department-count'); ?></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-department-summary-table"><colgroup><col class="hrim-dept-col-department"><col class="hrim-dept-col-assigned"><col class="hrim-dept-col-delayed"><col class="hrim-dept-col-resolved"></colgroup><thead><tr><th>Department</th><th>Assigned But not Completed</th><th>Delayed</th><th>Resolved Today</th></tr></thead><tbody><?php foreach($department_issue_rows as $department): ?><tr><td><strong><?php echo esc_html($department->name); ?></strong></td><td><?php echo esc_html($department->pending); ?></td><td><?php echo esc_html($department->delayed); ?></td><td><?php echo esc_html($department->resolved); ?></td></tr><?php endforeach; ?><?php if(!$department_issue_rows): ?><tr><td colspan="4" class="hrim-empty">No department issues found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-schedule-tasks"><div class="hrim-panel-head"><h2>Due Periodic Tasks</h2><?php echo $this->excel_button('dashboard-schedule-tasks-in-progress'); ?></div><?php echo $this->dashboard_schedule_tasks_table($schedule_rows); ?></div>
         <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-in-progress"><div class="hrim-panel-head"><h2>Inspection In Progress</h2><?php echo $this->excel_button('dashboard-inspection-in-progress'); ?></div><?php echo $this->dashboard_in_progress_table($in_progress_rows); ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-recent"><div class="hrim-panel-head"><h2>Recent Inspections</h2><?php echo $this->excel_button('dashboard-recent-inspections'); ?></div><?php echo $this->inspection_table($recent); ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-unassigned"><div class="hrim-panel-head"><div><h2>Pending Assign Issues</h2></div><?php echo $this->excel_button('dashboard-pending-assign-issues'); ?></div><?php echo $this->dashboard_issue_table($pending_assign,'pending_assign'); ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-pending"><div class="hrim-panel-head"><div><h2>Pending Issues</h2></div><?php echo $this->excel_button('dashboard-pending-issues'); ?></div><?php echo $this->dashboard_issue_table($pending,'pending'); ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-delay"><div class="hrim-panel-head"><div><h2>Delayed Issues</h2></div><?php echo $this->excel_button('dashboard-delayed-issues'); ?></div><?php echo $this->dashboard_issue_table($delay,'delayed'); ?></div>
-        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-resolved"><div class="hrim-panel-head"><div><h2>Resolved Issues</h2></div><?php echo $this->excel_button('dashboard-resolved-issues'); ?></div><?php echo $this->dashboard_issue_table($resolved,'resolved'); ?></div>
+        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-recent"><div class="hrim-panel-head"><h2>Recent Inspections</h2><?php echo $this->excel_button('dashboard-recent-inspections'); ?></div><?php echo $this->inspection_table($recent,false,true); ?></div>
+        <style id="hrim-dashboard-issue-widths-v31795">
+        @media (min-width:761px){
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table,
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table,
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(1),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(1),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(1){width:8%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(2),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(2),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(2){width:9%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(3),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(3),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(3){width:9%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(4),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(4),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(4){width:10%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(5),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(5),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(5){width:12%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(6),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(6),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(6){width:18%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(7),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(7),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(7){width:17%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(8),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(8),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(8){width:9%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table > * > tr > *:nth-child(9),
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table > * > tr > *:nth-child(9),
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table > * > tr > *:nth-child(9){width:8%!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table thead th,
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table thead th,
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table thead th{white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;padding-left:10px!important;padding-right:10px!important;}
+          .hrim-dashboard-pending table.hrim-dashboard-issue-table thead th.hrim-sortable::after,
+          .hrim-dashboard-delay table.hrim-dashboard-issue-table thead th.hrim-sortable::after,
+          .hrim-dashboard-resolved table.hrim-dashboard-issue-table thead th.hrim-sortable::after{position:static!important;display:inline!important;margin-left:5px!important;white-space:nowrap!important;}
+        }
+        </style>
+        <div class="hrim-panel hrim-dashboard-panel hrim-dashboard-pending"><div class="hrim-panel-head"><div><h2>Unresolved Issues</h2></div><?php echo $this->excel_button('dashboard-pending-issues'); ?></div><?php echo $this->dashboard_issue_table($pending,'pending'); ?></div>
+        <?php if($storage): ?>
+        <div class="hrim-panel hrim-dashboard-panel hrim-storage-panel">
+          <div class="hrim-panel-head">
+            <div><h2>Storage Usage</h2><small class="hrim-storage-updated">Last calculated: <?php echo esc_html($this->ist_date('d M Y, h:i A',$storage['calculated_at'])); ?></small></div>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="hrim-storage-refresh-form">
+              <input type="hidden" name="action" value="hrim_refresh_storage_usage">
+              <?php wp_nonce_field('hrim_refresh_storage_usage'); ?>
+              <button type="submit" class="hrim-icon-btn hrim-storage-refresh" title="Refresh Storage" aria-label="Refresh Storage"><span class="dashicons dashicons-update"></span></button>
+            </form>
+          </div>
+          <div class="hrim-storage-grid">
+            <div class="hrim-storage-card"><small>Photos</small><strong><?php echo esc_html(size_format((int)$storage['photo_bytes'],2)); ?></strong><span><?php echo esc_html(number_format_i18n((int)$storage['photo_count'])); ?> files</span></div>
+            <div class="hrim-storage-card"><small>Videos</small><strong><?php echo esc_html(size_format((int)$storage['video_bytes'],2)); ?></strong><span><?php echo esc_html(number_format_i18n((int)$storage['video_count'])); ?> files</span></div>
+            <div class="hrim-storage-card"><small>Database</small><strong><?php echo esc_html(size_format((int)$storage['database_bytes'],2)); ?></strong><span>RoomScore tables</span></div>
+            <div class="hrim-storage-card hrim-storage-total"><small>Total RoomScore</small><strong><?php echo esc_html(size_format((int)$storage['total_bytes'],2)); ?></strong><span>Photos + Videos + Database</span></div>
+          </div>
+          <p class="hrim-storage-note">Storage is cached for up to 6 hours so the Dashboard stays fast. Use Refresh only when you need an immediate recalculation.</p>
+        </div>
+        <?php endif; ?>
         <?php return $this->shell('Dashboard',ob_get_clean(),'dashboard');
     }
 
     private function dashboard_schedule_tasks_table($rows){
         global $wpdb;
         ob_start(); ?>
-        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Due Date</th><th>Task</th><th>Department</th><th>Rooms</th><th>Completed</th><th>Progress</th><th>Status</th><th class="hrim-no-export">Action</th></tr></thead><tbody>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Department</th><th>Task</th><th>Assets</th><th>Due Date</th><th>Completed</th><th>Progress</th><th>Status</th><th class="hrim-no-export">Action</th></tr></thead><tbody>
         <?php foreach($rows as $i=>$x):
             $total=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE instance_id=%d",$x->id));
             $done=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE instance_id=%d AND LOWER(TRIM(status)) IN ('completed','complete','1')",$x->id));
@@ -562,17 +979,17 @@ class HRIM_Core {
             if($pct>=100){ $progress_status='completed'; $progress_status_label='Completed'; }
             elseif($pct>0){ $progress_status='in_progress'; $progress_status_label='In Progress'; }
             else { $progress_status='yet_to_start'; $progress_status_label='Yet to Start'; }
-        ?><tr><td><?php echo $i+1; ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$x->due_date)); ?></td><td><?php echo esc_html($x->task_name); ?></td><td><?php echo esc_html($x->department_name?:'—'); ?></td><td><?php echo esc_html($total); ?></td><td><?php echo esc_html($done); ?></td><td><?php echo esc_html($pct); ?>%</td><td><span class="hrim-status <?php echo esc_attr($progress_status); ?>"><?php echo esc_html($progress_status_label); ?></span></td><td class="hrim-no-export"><div class="hrim-periodic-actions"><a class="hrim-action view" title="Open Task" href="<?php echo esc_url(add_query_arg('instance_id',$x->id,$this->page_url('hotel-inspection-schedule-tasks-in-progress'))); ?>"><span class="dashicons dashicons-visibility"></span></a></div></td></tr>
+        ?><tr><td><?php echo esc_html($x->department_name?:'—'); ?></td><td><?php echo esc_html($x->task_name); ?></td><td><?php echo esc_html($total); ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$x->due_date)); ?></td><td><?php echo esc_html($done); ?></td><td><?php echo esc_html($pct); ?>%</td><td><span class="hrim-status <?php echo esc_attr($progress_status); ?>"><?php echo esc_html($progress_status_label); ?></span></td><td class="hrim-no-export"><div class="hrim-periodic-actions"><a class="hrim-action view" title="Open Task" href="<?php echo esc_url(add_query_arg('instance_id',$x->id,$this->page_url('hotel-inspection-schedule-tasks-in-progress'))); ?>"><span class="dashicons dashicons-visibility"></span></a></div></td></tr>
         <?php endforeach; ?>
-        <?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">No scheduled tasks are due.</td></tr><?php endif; ?>
+        <?php if(!$rows): ?><tr><td colspan="8" class="hrim-empty">No scheduled tasks are due.</td></tr><?php endif; ?>
         </tbody></table></div>
         <?php return ob_get_clean();
     }
 
     private function dashboard_in_progress_table($rows){
         ob_start(); ?>
-        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><th>Floor</th><th>Room</th><th>Inspector</th><th>Completed</th><th>Progress</th><th>Last Updated</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
-        <?php $sl=0; foreach($rows as $r):
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Floor</th><th>Asset</th><th>Date</th><th>Inspector</th><th>Count</th><th>Progress</th><th>Last Updated</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
+        <?php foreach($rows as $r):
             $checklist=$this->in_progress_room_checklist((int)$r->room_id,(string)$r->draft_batch_id);
             $total_count=0; $answered_count=0;
             foreach($checklist as $section_items){
@@ -583,9 +1000,9 @@ class HRIM_Core {
                 }
             }
             $pct=$total_count?round(($answered_count/$total_count)*100):0;
-        ?><tr><td><?php echo ++$sl; ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->started_at?:$r->last_saved_at)); ?></td><td><?php echo esc_html($r->floor_name); ?></td><td><?php echo esc_html($r->room_no); ?></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($answered_count.' / '.$total_count); ?></td><td><strong><?php echo esc_html($pct); ?>%</strong></td><td><?php echo esc_html($this->ist_date('d/m/y, h:i A',$r->last_saved_at)); ?></td><td class="hrim-no-export"><div class="hrim-actions"><a class="hrim-icon-btn hrim-action-edit" title="Continue Inspection" href="<?php echo esc_url(add_query_arg('draft',$r->draft_batch_id,$this->page_url('perform-room-inspection'))); ?>"><span class="dashicons dashicons-edit"></span></a></div></td></tr>
+        ?><tr><td><?php echo esc_html($r->floor_name); ?></td><td><?php echo esc_html($r->room_no); ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->started_at?:$r->last_saved_at)); ?></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($answered_count.' / '.$total_count); ?></td><td><strong><?php echo esc_html($pct); ?>%</strong></td><td><?php echo esc_html($this->ist_date('d/m/y, h:i A',$r->last_saved_at)); ?></td><td class="hrim-no-export"><div class="hrim-actions"><a class="hrim-icon-btn hrim-action-edit" title="Continue Inspection" href="<?php echo esc_url(add_query_arg('draft',$r->draft_batch_id,$this->page_url('perform-room-inspection'))); ?>"><span class="dashicons dashicons-edit"></span></a></div></td></tr>
         <?php endforeach; ?>
-        <?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">Inspection records not found.</td></tr><?php endif; ?>
+        <?php if(!$rows): ?><tr><td colspan="8" class="hrim-empty">Inspection records not found.</td></tr><?php endif; ?>
         </tbody></table></div>
         <?php return ob_get_clean();
     }
@@ -595,7 +1012,7 @@ class HRIM_Core {
     private function latest_room_score_rows(){
         global $wpdb;
         $p=$wpdb->prefix;
-        $rooms=$wpdb->get_results("SELECT r.id,r.room_no,r.floor_id,f.name floor_name,f.floor_manager_id,u.display_name floor_manager FROM {$p}hrim_rooms r LEFT JOIN {$p}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->users} u ON u.ID=f.floor_manager_id WHERE r.status='active' ORDER BY f.sort_order,f.name,r.room_no");
+        $rooms=$wpdb->get_results("SELECT r.id,r.room_no,r.floor_id,at.name asset_type_name,f.name floor_name,f.floor_manager_id,u.display_name floor_manager FROM {$p}hrim_rooms r LEFT JOIN {$p}hrim_asset_types at ON at.id=r.asset_type_id LEFT JOIN {$p}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->users} u ON u.ID=f.floor_manager_id WHERE r.status='active' ORDER BY f.sort_order,f.name,r.room_no");
         foreach($rooms as $room){
             /* Final inspections can have status completed or failed. Only drafts are excluded. */
             $latest=$wpdb->get_row($wpdb->prepare(
@@ -637,27 +1054,14 @@ class HRIM_Core {
         $rows=$this->latest_room_score_rows();
         ob_start(); ?>
         <?php usort($rows, static function($a,$b){ return strnatcasecmp((string)$a->room_no,(string)$b->room_no); }); ?>
-        <div class="hrim-panel hrim-master-panel hrim-no-pagination"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('room-scores'); ?></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-mobile-score-cards hrim-room-score-table"><thead><tr><th>Sl.</th><th>Room</th><th>Score %</th><th>Issues</th><th>Last Inspection Date</th></tr></thead><tbody>
-        <?php $sl=0; foreach($rows as $r): ?><tr><td class="hrim-mobile-hide-sl" data-label="Sl."><?php echo ++$sl; ?></td><td class="hrim-score-card-title" data-label="Room"><strong><?php echo esc_html($r->room_no); ?></strong></td><td class="hrim-score-card-field" data-label="Score %"><?php if($r->score===null): ?><span class="hrim-muted">—</span><?php else: ?><span class="hrim-score-pill"><?php echo esc_html($r->score); ?>%</span><?php endif; ?></td><td class="hrim-score-card-field" data-label="Issues"><?php if((int)$r->open_issues>0): $room_issue_url=add_query_arg(['room_id'=>(int)$r->id,'open_only'=>'1'],$this->page_url('hotel-inspection-issues')); ?><a class="hrim-issue-count-link" href="<?php echo esc_url($room_issue_url); ?>" title="Open issues for Room <?php echo esc_attr($r->room_no); ?>"><?php echo esc_html((int)$r->open_issues); ?></a><?php else: ?>0<?php endif; ?></td><td class="hrim-score-card-field" data-label="Last Inspection Date"><?php echo $r->last_inspection?esc_html($this->ist_date('d/m/y',$r->last_inspection)):'—'; ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="5" class="hrim-empty">No assets found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <div class="hrim-panel hrim-master-panel hrim-score-view-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('room-scores'); ?></div></div><div class="hrim-table-wrap hrim-score-desktop-table"><table class="hrim-table hrim-exportable hrim-room-score-table"><thead><tr><th>Sl.</th><th>Asset</th><th>Score %</th><th>Issues</th><th>Last Inspection Date</th></tr></thead><tbody>
+        <?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html(trim(((trim((string)$r->asset_type_name)==='' || strcasecmp(trim((string)$r->asset_type_name),'Asset')===0)?'Room':$r->asset_type_name).' - '.$r->room_no)); ?></strong></td><td><?php if($r->score===null): ?><span class="hrim-muted">—</span><?php else: ?><span class="hrim-score-pill"><?php echo esc_html($r->score); ?>%</span><?php endif; ?></td><td><?php if((int)$r->open_issues>0): $room_issue_url=add_query_arg(['room_id'=>(int)$r->id,'open_only'=>'1'],$this->page_url('hotel-inspection-issues')); ?><a class="hrim-issue-count-link" href="<?php echo esc_url($room_issue_url); ?>" title="Open issues for Room <?php echo esc_attr($r->room_no); ?>"><?php echo esc_html((int)$r->open_issues); ?></a><?php else: ?>0<?php endif; ?></td><td><?php echo $r->last_inspection?esc_html($this->ist_date('d/m/y',$r->last_inspection)):'—'; ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="5" class="hrim-empty">No assets found.</td></tr><?php endif; ?></tbody></table></div>
+        <div class="hrim-score-mobile-list" aria-label="Room score cards"><?php foreach($rows as $r): $room_issue_url=(int)$r->open_issues>0?add_query_arg(['room_id'=>(int)$r->id,'open_only'=>'1'],$this->page_url('hotel-inspection-issues')):''; ?><article class="hrim-score-mobile-card" data-search="<?php echo esc_attr(strtolower(implode(' ',[(string)$r->asset_type_name,(string)$r->room_no,(string)$r->score,(string)$r->open_issues,(string)$r->last_inspection]))); ?>"><header class="hrim-score-mobile-card-head"><strong class="hrim-score-mobile-title"><?php echo esc_html(trim(((trim((string)$r->asset_type_name)==='' || strcasecmp(trim((string)$r->asset_type_name),'Asset')===0)?'Room':$r->asset_type_name).' - '.$r->room_no)); ?></strong></header><div class="hrim-score-mobile-row"><span>Score %</span><strong><?php echo $r->score===null?'—':esc_html($r->score).'%'; ?></strong></div><div class="hrim-score-mobile-row"><span>Issues</span><strong><?php if((int)$r->open_issues>0): ?><a href="<?php echo esc_url($room_issue_url); ?>"><?php echo esc_html((int)$r->open_issues); ?></a><?php else: ?>0<?php endif; ?></strong></div><div class="hrim-score-mobile-row"><span>Last Inspection Date</span><strong><?php echo $r->last_inspection?esc_html($this->ist_date('d/m/y',$r->last_inspection)):'—'; ?></strong></div></article><?php endforeach; ?><?php if(!$rows): ?><div class="hrim-score-mobile-empty">No assets found.</div><?php endif; ?></div></div>
         <?php return $this->shell('Room Score',ob_get_clean(),'room_scores');
     }
 
     public function floor_scores_shortcode(){
-        if(!$this->can_reports() && !$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','floor_scores');
-        global $wpdb; $p=$wpdb->prefix;
-        $room_rows=$this->latest_room_score_rows(); $by_floor=[];
-        foreach($room_rows as $r){
-            if(!isset($by_floor[$r->floor_id])) $by_floor[$r->floor_id]=['name'=>$r->floor_name,'manager'=>$r->floor_manager,'scores'=>[],'issues'=>0,'issue_rooms'=>[]];
-            if($r->score!==null) $by_floor[$r->floor_id]['scores'][]=(float)$r->score;
-            $by_floor[$r->floor_id]['issues']+=(int)$r->open_issues;
-            if((int)$r->open_issues>0) $by_floor[$r->floor_id]['issue_rooms'][(int)$r->id]=(string)$r->room_no;
-        }
-        $floors=$wpdb->get_results("SELECT f.id,f.name,u.display_name manager FROM {$p}hrim_floors f LEFT JOIN {$wpdb->users} u ON u.ID=f.floor_manager_id WHERE f.status='active' ORDER BY f.sort_order,f.name");
-        usort($floors, static function($a,$b){ return strnatcasecmp((string)$a->name,(string)$b->name); });
-        ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel hrim-no-pagination"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('floor-scores'); ?></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-mobile-score-cards hrim-floor-score-table"><thead><tr><th>Sl.</th><th>Floor No.</th><th>Manager</th><th>Score %</th><th>Rooms with Issues</th><th>Issues</th></tr></thead><tbody>
-        <?php $sl=0; foreach($floors as $f): $data=$by_floor[$f->id]??['scores'=>[],'issues'=>0,'issue_rooms'=>[]]; $score=$data['scores']?round(array_sum($data['scores'])/count($data['scores'])):null; $issue_rooms=$data['issue_rooms']??[]; natcasesort($issue_rooms); ?><tr><td class="hrim-mobile-hide-sl" data-label="Sl."><?php echo ++$sl; ?></td><td class="hrim-score-card-title" data-label="Floor No."><strong><?php echo esc_html($f->name); ?></strong></td><td class="hrim-score-card-field" data-label="Manager"><?php echo esc_html($f->manager?:'—'); ?></td><td class="hrim-score-card-field" data-label="Score %"><?php if($score===null): ?><span class="hrim-muted">—</span><?php else: ?><span class="hrim-score-pill"><?php echo esc_html($score); ?>%</span><?php endif; ?></td><td class="hrim-score-card-field hrim-score-card-wide" data-label="Rooms with Issues"><?php if($issue_rooms): ?><div class="hrim-issue-room-list"><?php foreach($issue_rooms as $room_id=>$room_no): $room_issue_url=add_query_arg(['room_id'=>(int)$room_id,'open_only'=>'1'],$this->page_url('hotel-inspection-issues')); ?><a class="hrim-issue-room-link" href="<?php echo esc_url($room_issue_url); ?>" title="Open issues for Room <?php echo esc_attr($room_no); ?>"><?php echo esc_html($room_no); ?></a><?php endforeach; ?></div><?php else: ?>—<?php endif; ?></td><td class="hrim-score-card-field" data-label="Issues"><?php if((int)$data['issues']>0): $floor_issue_url=add_query_arg(['floor_id'=>(int)$f->id,'open_only'=>'1'],$this->page_url('hotel-inspection-issues')); ?><a class="hrim-issue-count-link" href="<?php echo esc_url($floor_issue_url); ?>" title="Open issues for <?php echo esc_attr($f->name); ?>"><?php echo esc_html((int)$data['issues']); ?></a><?php else: ?>0<?php endif; ?></td></tr><?php endforeach; ?><?php if(!$floors): ?><tr><td colspan="6" class="hrim-empty">No floors found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php return $this->shell('Floor Score',ob_get_clean(),'floor_scores');
+        return $this->room_scores_shortcode();
     }
 
     public function sectionwise_checklist_shortcode(){
@@ -667,22 +1071,23 @@ class HRIM_Core {
         $default_section_id=absint($_GET['section_id']??0);
         $show_form=isset($_GET['add_checkpoint'])||$edit_id;
         $edit=$edit_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$p}hrim_questions WHERE id=%d AND is_library=1",$edit_id)):null;
-        $sections=$wpdb->get_results("SELECT s.*,d.name department_name,COUNT(q.id) checkpoint_count FROM {$p}hrim_sections s LEFT JOIN {$p}hrim_departments d ON d.id=s.department_id LEFT JOIN {$p}hrim_questions q ON q.section_id=s.id AND q.is_library=1 WHERE s.status='active' GROUP BY s.id ORDER BY s.sort_order,s.name");
-        $questions=$wpdb->get_results("SELECT q.*,s.name section_name,s.sort_order section_order FROM {$p}hrim_questions q INNER JOIN {$p}hrim_sections s ON s.id=q.section_id WHERE q.is_library=1 AND s.status='active' ORDER BY s.sort_order,s.name,q.sort_order,q.id");
+        $sections=$wpdb->get_results("SELECT s.*,COUNT(q.id) checkpoint_count FROM {$p}hrim_sections s LEFT JOIN {$p}hrim_questions q ON q.section_id=s.id AND q.is_library=1 WHERE s.status='active' GROUP BY s.id ORDER BY s.sort_order,s.name");
+        $departments=$wpdb->get_results("SELECT id,name FROM {$p}hrim_departments WHERE status='active' ORDER BY sort_order,name,id");
+        $questions=$wpdb->get_results("SELECT q.*,s.name section_name,s.sort_order section_order,d.name department_name FROM {$p}hrim_questions q INNER JOIN {$p}hrim_sections s ON s.id=q.section_id LEFT JOIN {$p}hrim_departments d ON d.id=q.department_id WHERE q.is_library=1 AND s.status='active' ORDER BY s.sort_order,s.name,q.sort_order,q.id");
         $grouped=[]; foreach($questions as $q) $grouped[$q->section_id][]=$q;
         ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel hrim-sectionwise-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('sectionwise-checklist'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add_checkpoint','1',$this->page_url('hotel-inspection-sectionwise-checklist'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Checkpoint</a></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-sectionwise-table"><thead><tr><th>Sl.</th><th class="hrim-col-checkpoint">Checkpoint</th><th>Mandatory</th><th>Status</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
-        <?php $sl=0; foreach($sections as $section): $items=$grouped[$section->id]??[]; ?><tr class="hrim-section-heading-row" data-section-name="<?php echo esc_attr(strtolower($section->name)); ?>"><td colspan="4"><div class="hrim-section-heading-main"><span class="hrim-section-heading-name"><?php echo esc_html($section->name); ?></span><span class="hrim-section-heading-count"><?php echo esc_html(count($items)); ?></span></div></td><td class="hrim-section-heading-action hrim-no-export"><a class="hrim-section-add-checkpoint" href="<?php echo esc_url(add_query_arg(['add_checkpoint'=>'1','section_id'=>(int)$section->id],$this->page_url('hotel-inspection-sectionwise-checklist'))); ?>" aria-label="Add checkpoint to <?php echo esc_attr($section->name); ?>" title="Add checkpoint"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></a></td></tr><?php if(!$items): ?><tr class="hrim-section-checkpoint-row" data-section-id="<?php echo esc_attr($section->id); ?>"><td>—</td><td class="hrim-muted">No checkpoints</td><td>—</td><td>—</td><td>—</td></tr><?php else: foreach($items as $q): ?><tr class="hrim-section-checkpoint-row" data-section-id="<?php echo esc_attr($section->id); ?>"><td><?php echo ++$sl; ?></td><td class="hrim-col-checkpoint"><?php echo esc_html($q->question); ?></td><td><?php echo $q->required_flag?'Yes':'No'; ?></td><td><span class="hrim-badge success">Active</span></td><td class="hrim-no-export"><?php echo $this->action_buttons('question',$q->id,'hotel-inspection-sectionwise-checklist','edit_checkpoint'); ?></td></tr><?php endforeach; endif; endforeach; ?><?php if(!$sections): ?><tr><td colspan="5" class="hrim-empty">No checklist sections found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-sectionwise-checklist')); ?>">×</a><h2><?php echo $edit?'Edit Checkpoint':'Add Checkpoint'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_question"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><input type="hidden" name="redirect_slug" value="hotel-inspection-sectionwise-checklist"><?php wp_nonce_field('hrim_save_question'); ?><label>Section<select name="section_id" required><option value="">Select Section</option><?php foreach($sections as $section): ?><option value="<?php echo esc_attr($section->id); ?>" <?php selected($edit->section_id??$default_section_id,$section->id); ?>><?php echo esc_html($section->name); ?><?php echo !empty($section->department_name)?' — '.esc_html($section->department_name):''; ?></option><?php endforeach; ?></select></label><label>Checkpoint<textarea name="question" required><?php echo esc_textarea($edit->question??''); ?></textarea></label><label>Display Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label class="hrim-check"><input type="checkbox" name="required_flag" value="1" <?php checked($edit->required_flag??1,1); ?>> Mandatory</label><input type="hidden" name="question_type" value="yes_no"><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
-        <?php return $this->shell('Sectionwise Checklist',ob_get_clean(),'sectionwise');
+        <div class="hrim-panel hrim-master-panel hrim-sectionwise-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('sectionwise-checklist'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add_checkpoint','1',$this->page_url('hotel-inspection-sectionwise-checklist'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Checkpoint</a></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-sectionwise-table"><thead><tr><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-department">Department</th><th class="hrim-sectionwise-status">Status</th><th class="hrim-no-export hrim-sectionwise-action">Action</th></tr></thead><tbody>
+        <?php foreach($sections as $section): $items=$grouped[$section->id]??[]; ?><tr class="hrim-section-heading-row" data-section-name="<?php echo esc_attr(strtolower($section->name)); ?>"><td colspan="3"><div class="hrim-section-heading-main"><span class="hrim-section-heading-name"><?php echo esc_html($section->name); ?></span><span class="hrim-section-heading-count"><?php echo esc_html(count($items)); ?></span></div></td><td class="hrim-section-heading-action hrim-no-export"><a class="hrim-section-add-checkpoint" href="<?php echo esc_url(add_query_arg(['add_checkpoint'=>'1','section_id'=>(int)$section->id],$this->page_url('hotel-inspection-sectionwise-checklist'))); ?>" aria-label="Add checkpoint to <?php echo esc_attr($section->name); ?>" title="Add checkpoint"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span></a></td></tr><?php if(!$items): ?><tr class="hrim-section-checkpoint-row" data-section-id="<?php echo esc_attr($section->id); ?>"><td class="hrim-muted">No checkpoints</td><td>—</td><td>—</td><td>—</td></tr><?php else: foreach($items as $q): ?><tr class="hrim-section-checkpoint-row" data-section-id="<?php echo esc_attr($section->id); ?>"><td class="hrim-col-checkpoint"><?php echo esc_html($q->question); ?></td><td class="hrim-col-department"><?php echo esc_html($q->department_name ?: '—'); ?></td><td class="hrim-sectionwise-status"><span class="hrim-badge success">Active</span></td><td class="hrim-no-export hrim-sectionwise-action"><?php echo $this->action_buttons('question',$q->id,'hotel-inspection-sectionwise-checklist','edit_checkpoint'); ?></td></tr><?php endforeach; endif; endforeach; ?><?php if(!$sections): ?><tr><td colspan="4" class="hrim-empty">No checklist sections found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-sectionwise-checklist')); ?>">×</a><h2><?php echo $edit?'Edit Checkpoint':'Add Checkpoint'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_question"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><input type="hidden" name="redirect_slug" value="hotel-inspection-sectionwise-checklist"><?php wp_nonce_field('hrim_save_question'); ?><label>Section<select name="section_id" required><option value="">Select Section</option><?php foreach($sections as $section): ?><option value="<?php echo esc_attr($section->id); ?>" <?php selected($edit->section_id??$default_section_id,$section->id); ?>><?php echo esc_html($section->name); ?></option><?php endforeach; ?></select></label><label>Department<select name="department_id" required><option value="">Select Department</option><?php foreach($departments as $department): ?><option value="<?php echo esc_attr($department->id); ?>" <?php selected($edit->department_id??0,$department->id); ?>><?php echo esc_html($department->name); ?></option><?php endforeach; ?></select></label><label>Checkpoint<textarea name="question" required><?php echo esc_textarea($edit->question??''); ?></textarea></label><label>Display Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><input type="hidden" name="required_flag" value="1"><input type="hidden" name="question_type" value="yes_no"><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
+        <?php return $this->shell('Sectionwise Checklists',ob_get_clean(),'sectionwise');
     }
 
     private function master_template_config($type){
         $configs=[
             'floors'=>['slug'=>'hotel-inspection-floors','headers'=>['Property','Floor','Floor Manager','Sort Order','Status']],
-            'room_categories'=>['slug'=>'hotel-inspection-room-categories','headers'=>['Category','Description','Assigned Templates','Status']],
-            'rooms'=>['slug'=>'hotel-inspection-rooms','headers'=>['Property','Floor','Asset','Asset Type','Applicable Templates','Status']],
-            'departments'=>['slug'=>'hotel-inspection-departments','headers'=>['Department','Department Head','Description','Status']],
+            'room_categories'=>['slug'=>'hotel-inspection-room-categories','headers'=>['Category','Assigned Templates','Status']],
+            'rooms'=>['slug'=>'hotel-inspection-rooms','headers'=>['Property','Floor','Asset','Asset Type','Sections','Status']],
+            'departments'=>['slug'=>'hotel-inspection-departments','headers'=>['Department','Department Head','Status']],
             'users'=>['slug'=>'hotel-inspection-users','headers'=>['Full Name','Username','Email','Mobile','Password','Role','Departments','Status','Views']],
         ];
         return $configs[$type]??null;
@@ -747,20 +1152,21 @@ class HRIM_Core {
                 foreach($templates as $tn){$tid=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_templates WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND status='active'",$tn));if(!$tid)$this->import_error($errors,$n,'Assigned Templates',$tn,'Template not found.');else$tids[]=$tid;}
                 $clean=['name'=>$name,'description'=>$description,'status'=>$status,'template_ids'=>$tids];
             }elseif($type==='rooms'){
-                $property=trim($r['property']??'');$floor=trim($r['floor']??'');$asset=trim($r['asset']??'');$asset_type_name=trim($r['asset_type']??'Asset');$status=strtolower(trim($r['status']??'active'));$templates=$this->csv_list($r['applicable_templates']??'');$tids=[];
+                $property=trim($r['property']??'');$floor=trim($r['floor']??'');$asset=trim($r['asset']??'');$asset_type_name=trim($r['asset_type']??'Asset');$status=strtolower(trim($r['status']??'active'));$section_names=$this->csv_list($r['sections']??'');$section_ids=[];
                 $single=$this->single_active_property();$hotel=$property!==''?$wpdb->get_row($wpdb->prepare("SELECT id,name FROM {$wpdb->prefix}hrim_hotels WHERE LOWER(TRIM(name))=LOWER(TRIM(%s))",$property)):$single;if(!$hotel)$this->import_error($errors,$n,'Property',$property,'Property not found.');
                 $floorrow=$hotel?$wpdb->get_row($wpdb->prepare("SELECT id,name FROM {$wpdb->prefix}hrim_floors WHERE hotel_id=%d AND LOWER(TRIM(name))=LOWER(TRIM(%s))",$hotel->id,$floor)):null;if(!$floorrow)$this->import_error($errors,$n,'Floor',$floor,'Floor not found under the selected property.');
                 $asset_type=$wpdb->get_row($wpdb->prepare("SELECT id,name FROM {$wpdb->prefix}hrim_asset_types WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND status='active'",$asset_type_name));if(!$asset_type)$this->import_error($errors,$n,'Asset Type',$asset_type_name,'Asset Type not found.');
                 if($asset==='')$this->import_error($errors,$n,'Asset',$asset,'Asset is required.');if(!in_array($status,$status_ok,true))$this->import_error($errors,$n,'Status',$status,'Use Active or Inactive.');
                 $dupkey=strtolower(($hotel->id??0).'|'.$asset);if(isset($seen[$dupkey]))$this->import_error($errors,$n,'Asset',$asset,'Duplicate asset in uploaded file.');$seen[$dupkey]=1;if($hotel&&$asset!==''&&$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_rooms WHERE hotel_id=%d AND room_no=%s",$hotel->id,$asset)))$this->import_error($errors,$n,'Asset',$asset,'This asset name or number already exists for the property.');
-                foreach($templates as $tn){$tid=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_templates WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND status='active'",$tn));if(!$tid)$this->import_error($errors,$n,'Applicable Templates',$tn,'Template not found.');else$tids[]=$tid;}
-                $clean=['hotel_id'=>(int)($hotel->id??0),'floor_id'=>(int)($floorrow->id??0),'asset_type_id'=>(int)($asset_type->id??0),'category_id'=>null,'category'=>'','room_no'=>$asset,'status'=>$status,'template_ids'=>$tids];
+                foreach($section_names as $section_name){$sid=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND status='active'",$section_name));if(!$sid)$this->import_error($errors,$n,'Sections',$section_name,'Section not found.');else$section_ids[]=$sid;}
+                if(!$section_ids)$this->import_error($errors,$n,'Sections','', 'At least one active section is required.');
+                $clean=['hotel_id'=>(int)($hotel->id??0),'floor_id'=>(int)($floorrow->id??0),'asset_type_id'=>(int)($asset_type->id??0),'category_id'=>null,'category'=>'','room_no'=>$asset,'status'=>$status,'section_ids'=>$section_ids];
             }elseif($type==='departments'){
                 $name=trim($r['department']??'');$head_value=trim($r['department_head']??'');$head_id=$head_value===''?0:$this->lookup_user_id($head_value);$description=trim($r['description']??'');$status=strtolower(trim($r['status']??'active'));if($head_value!==''&&!$head_id)$this->import_error($errors,$n,'Department Head',$head_value,'User not found or name is ambiguous.');if($head_id&&!$this->normalize_mobile_number(get_user_meta($head_id,'hrim_mobile',true)))$this->import_error($errors,$n,'Department Head',$head_value,'Selected user does not have a mobile number.');if($name==='')$this->import_error($errors,$n,'Department',$name,'Department is required.');if(!in_array($status,$status_ok,true))$this->import_error($errors,$n,'Status',$status,'Use Active or Inactive.');$keyn=strtolower($name);if(isset($seen[$keyn]))$this->import_error($errors,$n,'Department',$name,'Duplicate department in uploaded file.');$seen[$keyn]=1;if($name!==''&&$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_departments WHERE LOWER(TRIM(name))=LOWER(TRIM(%s))",$name)))$this->import_error($errors,$n,'Department',$name,'This department already exists.');$clean=['name'=>$name,'description'=>$description,'department_head_user_id'=>$head_id?:null,'sort_order'=>0,'status'=>$status];
             }elseif($type==='users'){
                 $name=trim($r['full_name']??'');$username=sanitize_user($r['username']??'',true);$email=sanitize_email($r['email']??'');$mobile=$this->normalize_mobile_number($r['mobile']??'');if(strlen($mobile)<10||strlen($mobile)>15)$this->import_error($errors,$n,'Mobile',$r['mobile']??'','Valid mobile number with country code is required.');$password=(string)($r['password']??'');$role=strtolower(trim($r['role']??''));$status=strtolower(trim($r['status']??'active'));$departments=$this->csv_list($r['departments']??'');$views=$this->csv_list($r['views']??'All');$roles=['worker'=>'hrim_worker','supervisor'=>'hrim_supervisor','manager'=>'hrim_manager','owner'=>'hrim_owner'];$dids=[];$view_slugs=[];
-                if($name==='')$this->import_error($errors,$n,'Full Name',$name,'Full Name is required.');if($username==='')$this->import_error($errors,$n,'Username',$r['username']??'','Valid Username is required.');if(!$email)$this->import_error($errors,$n,'Email',$r['email']??'','Valid Email is required.');if(strlen($password)<8)$this->import_error($errors,$n,'Password','********','Password must contain at least 8 characters.');if(!isset($roles[$role]))$this->import_error($errors,$n,'Role',$role,'Use Worker, Supervisor, Manager or Owner.');if(!in_array($status,$status_ok,true))$this->import_error($errors,$n,'Status',$status,'Use Active or Inactive.');
-                foreach([['username',$username],['email',$email]] as $pair){$k=$pair[0].'|'.strtolower($pair[1]);if(isset($seen[$k]))$this->import_error($errors,$n,ucfirst($pair[0]),$pair[1],'Duplicate value in uploaded file.');$seen[$k]=1;}if($username&&username_exists($username))$this->import_error($errors,$n,'Username',$username,'Username already exists.');if($email&&email_exists($email))$this->import_error($errors,$n,'Email',$email,'Email already exists.');
+                if($name==='')$this->import_error($errors,$n,'Full Name',$name,'Full Name is required.');if($username==='')$this->import_error($errors,$n,'Username',$r['username']??'','Valid Username is required.');if(trim((string)($r['email']??''))!==''&&!$email)$this->import_error($errors,$n,'Email',$r['email']??'','Enter a valid Email or leave it blank.');if(strlen($password)<8)$this->import_error($errors,$n,'Password','********','Password must contain at least 8 characters.');if(!isset($roles[$role]))$this->import_error($errors,$n,'Role',$role,'Use Worker, Supervisor, Manager or Owner.');if(!in_array($status,$status_ok,true))$this->import_error($errors,$n,'Status',$status,'Use Active or Inactive.');
+                foreach([['username',$username],['email',$email]] as $pair){if($pair[0]==='email'&&$pair[1]==='')continue;$k=$pair[0].'|'.strtolower($pair[1]);if(isset($seen[$k]))$this->import_error($errors,$n,ucfirst($pair[0]),$pair[1],'Duplicate value in uploaded file.');$seen[$k]=1;}if($username&&username_exists($username))$this->import_error($errors,$n,'Username',$username,'Username already exists.');if($email&&email_exists($email))$this->import_error($errors,$n,'Email',$email,'Email already exists.');
                 foreach($departments as $dn){$did=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_departments WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND status='active'",$dn));if(!$did)$this->import_error($errors,$n,'Departments',$dn,'Active department not found.');else$dids[]=$did;}if(!$dids)$this->import_error($errors,$n,'Departments',implode(', ',$departments),'At least one valid department is required.');
                 $viewmap=$this->configurable_view_map();if(count($views)===1&&strtolower($views[0])==='all')$view_slugs=$this->all_view_slugs();else{foreach($views as $vn){$found='';foreach($viewmap as $v){if(strtolower($v['label'])===strtolower($vn)||strtolower($v['slug'])===strtolower($vn)){$found=$v['slug'];break;}}if(!$found)$this->import_error($errors,$n,'Views',$vn,'View name not found.');else$view_slugs[]=$found;}}if(!$view_slugs)$this->import_error($errors,$n,'Views',implode(', ',$views),'At least one valid view is required.');
                 $clean=['display_name'=>$name,'username'=>$username,'email'=>$email,'mobile'=>$mobile,'password'=>$password,'role'=>$roles[$role]??'','status'=>$status,'department_ids'=>$dids,'allowed_views'=>$view_slugs];
@@ -772,7 +1178,7 @@ class HRIM_Core {
         foreach($validated as $data){
             if($type==='floors'){$ok=$wpdb->insert($wpdb->prefix.'hrim_floors',$data);if($ok)$imported++;}
             elseif($type==='room_categories'){$tids=$data['template_ids'];unset($data['template_ids']);if($wpdb->insert($wpdb->prefix.'hrim_room_categories',$data)){ $cid=(int)$wpdb->insert_id;foreach($tids as $tid)$wpdb->insert($wpdb->prefix.'hrim_category_templates',['category_id'=>$cid,'template_id'=>$tid]);$imported++;}}
-            elseif($type==='rooms'){$tids=$data['template_ids'];unset($data['template_ids']);$data['template_id']=null;if($wpdb->insert($wpdb->prefix.'hrim_rooms',$data)){ $rid=(int)$wpdb->insert_id;foreach($tids as $tid)$wpdb->insert($wpdb->prefix.'hrim_room_templates',['room_id'=>$rid,'template_id'=>$tid]);$imported++;}}
+            elseif($type==='rooms'){$section_ids=$data['section_ids'];unset($data['section_ids']);$data['template_id']=null;if($wpdb->insert($wpdb->prefix.'hrim_rooms',$data)){ $rid=(int)$wpdb->insert_id;foreach($section_ids as $order=>$sid)$wpdb->insert($wpdb->prefix.'hrim_room_sections',['room_id'=>$rid,'section_id'=>$sid,'sort_order'=>$order+1]);$imported++;}}
             elseif($type==='departments'){if($wpdb->insert($wpdb->prefix.'hrim_departments',$data)){ $did=(int)$wpdb->insert_id; if(!empty($data['department_head_user_id']))$wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_user_departments (user_id,department_id) VALUES (%d,%d)",(int)$data['department_head_user_id'],$did)); $imported++; }}
             elseif($type==='users'){$uid=wp_create_user($data['username'],$data['password'],$data['email']);if(!is_wp_error($uid)){wp_update_user(['ID'=>$uid,'display_name'=>$data['display_name']]);(new WP_User($uid))->set_role($data['role']);update_user_meta($uid,'hrim_user_status',$data['status']);update_user_meta($uid,'hrim_mobile',$data['mobile']);update_user_meta($uid,'hrim_allowed_views',$data['allowed_views']);foreach($data['department_ids'] as $did)$wpdb->insert($wpdb->prefix.'hrim_user_departments',['user_id'=>$uid,'department_id'=>$did]);$imported++;}}
         }
@@ -780,12 +1186,8 @@ class HRIM_Core {
     }
 
     public function properties_shortcode(){
-        if(!$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','properties');
-        global $wpdb; $edit_id=absint($_GET['edit']??0); $show_form=isset($_GET['add'])||$edit_id; $edit=$edit_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_hotels WHERE id=%d",$edit_id)):null;
-        $hotels=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_hotels ORDER BY name"); ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('properties'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-properties'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Property</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Property</th><th>Address</th><th>Status</th><th class="hrim-no-export">Actions</th></tr></thead><tbody><?php $sl=0; foreach($hotels as $h): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html($h->name); ?></strong></td><td><?php echo esc_html($h->address); ?></td><td><span class="hrim-badge <?php echo $h->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($h->status)); ?></span></td><td><?php echo $this->action_buttons('hotel',$h->id,'hotel-inspection-properties'); ?></td></tr><?php endforeach; ?><?php if(!$hotels): ?><tr><td colspan="5" class="hrim-empty">No properties found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-properties')); ?>">×</a><h2><?php echo $edit?'Edit Property':'Add Property'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_hotel"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_hotel'); ?><label>Property Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Address<textarea name="address"><?php echo esc_textarea($edit->address??''); ?></textarea></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
-        <?php return $this->shell('Properties',ob_get_clean(),'properties');
+        wp_safe_redirect($this->page_url('hotel-inspection-settings'));
+        exit;
     }
 
     public function floors_shortcode(){
@@ -795,7 +1197,7 @@ class HRIM_Core {
         $floor_managers=$this->active_app_users(['administrator','hrim_manager','hrim_inspector','hrim_housekeeping']);
         $floors=$wpdb->get_results("SELECT f.*,h.name hotel_name,u.display_name floor_manager_name FROM {$wpdb->prefix}hrim_floors f LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=f.hotel_id LEFT JOIN {$wpdb->users} u ON u.ID=f.floor_manager_id ORDER BY h.name,f.sort_order,f.name"); ob_start(); ?>
         <?php $single_property=$this->single_active_property(); ?>
-        <?php echo $this->master_import_feedback('floors'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('floors'); ?><?php echo $this->excel_button('floors'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-floors'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Floor</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><?php if(!$single_property): ?><th>Property</th><?php endif; ?><th>Floor</th><th>Floor Manager</th><th>Sort Order</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($floors as $f): ?><tr><td><?php echo ++$sl; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($f->hotel_name); ?></td><?php endif; ?><td><strong><?php echo esc_html($f->name); ?></strong></td><td><?php echo esc_html($f->floor_manager_name ?: '—'); ?></td><td><?php echo esc_html($f->sort_order); ?></td><td><span class="hrim-badge <?php echo $f->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($f->status)); ?></span></td><td><?php echo $this->action_buttons('floor',$f->id,'hotel-inspection-floors'); ?></td></tr><?php endforeach; ?><?php if(!$floors): ?><tr><td colspan="<?php echo $single_property?6:7; ?>" class="hrim-empty">No floors found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php echo $this->master_import_feedback('floors'); ?><div class="hrim-panel hrim-master-panel hrim-floors-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('floors'); ?><?php echo $this->excel_button('floors'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-floors'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Floor</a></div></div><div class="hrim-table-wrap hrim-floors-desktop-wrap"><table class="hrim-table hrim-floors-table"><thead><tr><th class="hrim-floor-col-sl">Sl.</th><?php if(!$single_property): ?><th class="hrim-floor-col-property">Property</th><?php endif; ?><th class="hrim-floor-col-floor">Floor</th><th class="hrim-floor-col-manager">Floor Manager</th><th class="hrim-floor-col-sort">Sort Order</th><th class="hrim-floor-col-status">Status</th><th class="hrim-floor-col-action">Actions</th></tr></thead><tbody><?php $sl=0; foreach($floors as $f): ?><tr><td class="hrim-floor-col-sl"><?php echo ++$sl; ?></td><?php if(!$single_property): ?><td class="hrim-floor-col-property"><?php echo esc_html($f->hotel_name); ?></td><?php endif; ?><td class="hrim-floor-col-floor"><strong><?php echo esc_html($f->name); ?></strong></td><td class="hrim-floor-col-manager"><?php echo esc_html($f->floor_manager_name ?: '—'); ?></td><td class="hrim-floor-col-sort"><input type="number" class="hrim-inline-floor-sort-order" data-floor-id="<?php echo esc_attr($f->id); ?>" value="<?php echo esc_attr($f->sort_order); ?>" inputmode="numeric" aria-label="Sort order for <?php echo esc_attr($f->name); ?>"><span class="hrim-inline-floor-save-state" aria-live="polite"></span></td><td class="hrim-floor-col-status"><span class="hrim-badge <?php echo $f->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($f->status)); ?></span></td><td class="hrim-floor-col-action"><?php echo $this->action_buttons('floor',$f->id,'hotel-inspection-floors'); ?></td></tr><?php endforeach; ?><?php if(!$floors): ?><tr><td colspan="<?php echo $single_property?6:7; ?>" class="hrim-empty">No floors found.</td></tr><?php endif; ?></tbody></table></div><div class="hrim-table-wrap hrim-floors-mobile-wrap"><table class="hrim-table hrim-floors-mobile-table"><colgroup><col class="hrim-mobile-floor-col"><col class="hrim-mobile-sort-col"><col class="hrim-mobile-action-col"></colgroup><thead><tr><th>Floor</th><th>Sort Order</th><th>Actions</th></tr></thead><tbody><?php foreach($floors as $f): ?><tr><td class="hrim-mobile-floor"><strong><?php echo esc_html($f->name); ?></strong></td><td class="hrim-mobile-sort"><input type="number" class="hrim-inline-floor-sort-order" data-floor-id="<?php echo esc_attr($f->id); ?>" value="<?php echo esc_attr($f->sort_order); ?>" inputmode="numeric" aria-label="Sort order for <?php echo esc_attr($f->name); ?>"><span class="hrim-inline-floor-save-state" aria-live="polite"></span></td><td class="hrim-mobile-action"><?php echo $this->action_buttons('floor',$f->id,'hotel-inspection-floors'); ?></td></tr><?php endforeach; ?><?php if(!$floors): ?><tr><td colspan="3" class="hrim-empty">No floors found.</td></tr><?php endif; ?></tbody></table></div></div>
         <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-floors')); ?>">×</a><h2><?php echo $edit?'Edit Floor':'Add Floor'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_floor"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_floor'); ?><?php if($single_property): ?><input type="hidden" name="hotel_id" value="<?php echo esc_attr($single_property->id); ?>"><?php else: ?><label>Property<select name="hotel_id" required><option value="">Select</option><?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>" <?php selected($edit->hotel_id??0,$h->id); ?>><?php echo esc_html($h->name); ?></option><?php endforeach; ?></select></label><?php endif; ?><label>Floor Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Floor Manager<select name="floor_manager_id"><option value="0">Select Floor Manager</option><?php foreach($floor_managers as $manager): ?><option value="<?php echo esc_attr($manager->ID); ?>" <?php selected((int)($edit->floor_manager_id??0),(int)$manager->ID); ?>><?php echo esc_html($manager->display_name); ?></option><?php endforeach; ?></select></label><label>Sort Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
         <?php echo $this->master_import_modal('floors'); return $this->shell('Floors',ob_get_clean(),'floors');
     }
@@ -808,8 +1210,28 @@ class HRIM_Core {
         $edit=$edit_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_asset_types WHERE id=%d",$edit_id)):null;
         $rows=$wpdb->get_results("SELECT at.*,COUNT(r.id) asset_count FROM {$wpdb->prefix}hrim_asset_types at LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.asset_type_id=at.id GROUP BY at.id ORDER BY at.sort_order,at.name");
         ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('asset-types'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-asset-types'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Asset Type</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Asset Type</th><th>Description</th><th>Assets</th><th>Sort Order</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html($r->name); ?></strong></td><td><?php echo esc_html($r->description); ?></td><td><?php echo esc_html($r->asset_count); ?></td><td><?php echo esc_html($r->sort_order); ?></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('asset_type',$r->id,'hotel-inspection-asset-types'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">No asset types found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-asset-types')); ?>">×</a><h2><?php echo $edit?'Edit Asset Type':'Add Asset Type'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_asset_type"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_asset_type'); ?><label>Asset Type *<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Description<textarea name="description"><?php echo esc_textarea($edit->description??''); ?></textarea></label><label>Sort Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update Asset Type':'Save Asset Type'; ?></button></div></form></div></div><?php endif; ?>
+        <style id="hrim-asset-types-mobile-v31773">
+@media (max-width:760px){
+html body .hrim-app-shell .hrim-content .hrim-asset-types-panel .hrim-table-wrap{overflow-x:hidden!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(1),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(1),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(5),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(5),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(6),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(6){display:none!important;width:0!important;padding:0!important;border:0!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(2),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(2){display:table-cell!important;width:54%!important;white-space:normal!important;overflow-wrap:anywhere!important;text-align:left!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(3),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(3){display:table-cell!important;width:18%!important;text-align:center!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th:nth-child(4),
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td:nth-child(4){display:table-cell!important;width:28%!important;text-align:center!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table th,
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table td{padding:7px 5px!important;box-sizing:border-box!important;}
+html body .hrim-app-shell .hrim-content table.hrim-asset-types-table .hrim-inline-sort-order{display:inline-block!important;width:52px!important;max-width:52px!important;height:30px!important;padding:2px 4px!important;font-size:11px!important;}
+}
+</style><div class="hrim-panel hrim-master-panel hrim-asset-types-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('asset-types'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-asset-types'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Asset Type</a></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-asset-types-table"><thead><tr><th>Sl.</th><th>Asset Type</th><th>Asset</th><th>Sort Order</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html($r->name); ?></strong></td><td><?php echo esc_html($r->asset_count); ?></td><td><input type="number" class="hrim-inline-sort-order" data-asset-type-id="<?php echo esc_attr($r->id); ?>" value="<?php echo esc_attr($r->sort_order); ?>" inputmode="numeric" aria-label="Sort order for <?php echo esc_attr($r->name); ?>"><span class="hrim-inline-save-state" aria-live="polite"></span></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('asset_type',$r->id,'hotel-inspection-asset-types'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="6" class="hrim-empty">No asset types found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-asset-types')); ?>">×</a><h2><?php echo $edit?'Edit Asset Type':'Add Asset Type'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_asset_type"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_asset_type'); ?><label>Asset Type *<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Sort Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update Asset Type':'Save Asset Type'; ?></button></div></form></div></div><?php endif; ?>
         <?php return $this->shell('Asset Types',ob_get_clean(),'asset_types');
     }
 
@@ -829,50 +1251,48 @@ class HRIM_Core {
         $hotels=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_hotels WHERE status='active' ORDER BY name");
         $floors=$wpdb->get_results("SELECT f.*,h.name hotel_name FROM {$wpdb->prefix}hrim_floors f LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=f.hotel_id WHERE f.status='active' ORDER BY h.name,f.sort_order,f.name");
         $asset_types=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_asset_types WHERE status='active' ORDER BY sort_order,name");
-        $templates=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_templates WHERE status='active' ORDER BY name");
+        $sections=$wpdb->get_results("SELECT s.*,COUNT(q.id) point_count FROM {$wpdb->prefix}hrim_sections s LEFT JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1 WHERE s.status='active' GROUP BY s.id ORDER BY s.sort_order,s.name");
 
-        $selected_templates=[];
-        $inherited_templates=[];
-        $excluded_templates=[];
+        $selected_section_ids=[];
         $available_room_questions=[];
         $excluded_question_ids=[];
         $room_additions=[];
         if($edit_id && $edit){
-            $direct=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT template_id FROM {$wpdb->prefix}hrim_room_templates WHERE room_id=%d",$edit_id)));
-            $excluded_templates=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT template_id FROM {$wpdb->prefix}hrim_room_template_exclusions WHERE room_id=%d",$edit_id)));
-            $legacy_inherited=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT template_id FROM {$wpdb->prefix}hrim_category_templates WHERE category_id=%d",(int)$edit->category_id)));
-            $inherited_templates=[];
-            $selected_templates=array_values(array_unique(array_merge(array_diff($legacy_inherited,$excluded_templates),$direct)));
+            $selected_section_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_room_sections WHERE room_id=%d ORDER BY sort_order,section_id",$edit_id)));
             $excluded_question_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT question_id FROM {$wpdb->prefix}hrim_room_question_exclusions WHERE room_id=%d",$edit_id)));
-            if($selected_templates){
-                $ph=implode(',',array_fill(0,count($selected_templates),'%d'));
-                $available_room_questions=$wpdb->get_results($wpdb->prepare("SELECT DISTINCT q.id,q.question,q.question_type,q.required_flag,q.sort_order,s.id section_id,s.name section_name,s.sort_order section_order,GROUP_CONCAT(DISTINCT t.name ORDER BY t.name SEPARATOR ', ') template_names FROM {$wpdb->prefix}hrim_template_sections ts INNER JOIN {$wpdb->prefix}hrim_templates t ON t.id=ts.template_id INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=ts.section_id INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1 LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id WHERE ts.template_id IN ($ph) AND rr.question_id IS NULL GROUP BY q.id,q.question,q.question_type,q.required_flag,q.sort_order,s.id,s.name,s.sort_order ORDER BY s.sort_order,s.name,q.sort_order,q.id",array_merge([$edit_id],$selected_templates)));
+            if($selected_section_ids){
+                $ph=implode(',',array_fill(0,count($selected_section_ids),'%d'));
+                $available_room_questions=$wpdb->get_results($wpdb->prepare("SELECT q.id,q.question,q.question_type,q.required_flag,q.sort_order,q.department_id,s.id section_id,s.name section_name,s.sort_order section_order,d.name department_name FROM {$wpdb->prefix}hrim_sections s INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1 LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=q.department_id LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id WHERE s.id IN ($ph) AND rr.question_id IS NULL ORDER BY s.sort_order,s.name,q.sort_order,q.id",array_merge([$edit_id],$selected_section_ids)));
+                // Repair the earlier save behaviour that could exclude every
+                // checkpoint automatically. All checkpoints must show by default;
+                // exclusions are valid only when the user deliberately unticks some.
+                $available_ids=array_map(function($q){return (int)$q->id;},$available_room_questions);
+                if($available_ids && !array_diff($available_ids,$excluded_question_ids)){
+                    $wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$edit_id]);
+                    $excluded_question_ids=[];
+                }
             }
             $room_additions=$wpdb->get_results($wpdb->prepare("SELECT a.id addition_id,a.template_id,a.question_id,q.section_id,q.question,q.question_type,q.required_flag,q.sort_order FROM {$wpdb->prefix}hrim_room_question_additions a INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id WHERE a.room_id=%d ORDER BY a.id",$edit_id));
         }
-        $selected_asset_sections=[];
-        if($selected_templates){
-            $ph=implode(',',array_fill(0,count($selected_templates),'%d'));
-            $selected_asset_sections=$wpdb->get_results($wpdb->prepare("SELECT DISTINCT s.id,s.name,s.sort_order FROM {$wpdb->prefix}hrim_template_sections ts INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=ts.section_id WHERE ts.template_id IN ($ph) AND s.status='active' ORDER BY s.sort_order,s.name",$selected_templates));
-        }
+        $selected_asset_sections=$edit_id?$wpdb->get_results($wpdb->prepare("SELECT s.id,s.name,s.sort_order FROM {$wpdb->prefix}hrim_room_sections rs INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=rs.section_id WHERE rs.room_id=%d AND s.status='active' ORDER BY rs.sort_order,s.sort_order,s.name",$edit_id)):[];
 
         $rooms=$wpdb->get_results("SELECT r.*,h.name hotel_name,f.name floor_name,at.name asset_type_name FROM {$wpdb->prefix}hrim_rooms r LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=r.hotel_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id ORDER BY h.name,f.sort_order,r.room_no");
         foreach($rooms as $r){
-            $effective=$wpdb->get_col($wpdb->prepare("SELECT DISTINCT t.name FROM {$wpdb->prefix}hrim_templates t WHERE t.id IN (SELECT template_id FROM {$wpdb->prefix}hrim_room_templates WHERE room_id=%d UNION SELECT ct.template_id FROM {$wpdb->prefix}hrim_category_templates ct WHERE ct.category_id=%d AND NOT EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions x WHERE x.room_id=%d AND x.template_id=ct.template_id)) ORDER BY t.name",$r->id,$r->category_id,$r->id));
-            $r->effective_template_names=implode(', ',$effective);
+            $effective=$wpdb->get_col($wpdb->prepare("SELECT s.name FROM {$wpdb->prefix}hrim_room_sections rs INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=rs.section_id WHERE rs.room_id=%d ORDER BY rs.sort_order,s.sort_order,s.name",$r->id));
+            $r->effective_section_names=implode(', ',$effective);
         }
         ob_start(); ?>
         <?php $single_property=$this->single_active_property(); ?>
-        <?php echo $this->master_import_feedback('rooms'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('rooms'); ?><?php echo $this->excel_button('rooms'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-rooms'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Asset</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><?php if(!$single_property): ?><th>Property</th><?php endif; ?><th>Floor</th><th>Asset</th><th>Asset Type</th><th>Applicable Templates</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rooms as $r): ?><tr><td><?php echo ++$sl; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name); ?></td><td><strong><?php echo esc_html($r->room_no); ?></strong></td><td><?php echo esc_html($r->asset_type_name?:'Asset'); ?></td><td><?php echo esc_html($r->effective_template_names?:'No template assigned'); ?></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('room',$r->id,'hotel-inspection-rooms'); ?></td></tr><?php endforeach; ?><?php if(!$rooms): ?><tr><td colspan="<?php echo $single_property?7:8; ?>" class="hrim-empty">No assets found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card hrim-modal-wide"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-rooms')); ?>">×</a><h2><?php echo $edit?'Edit Asset':'Add Asset'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_room"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_room'); ?><div class="hrim-grid-2"><?php if($single_property): ?><input type="hidden" name="hotel_id" value="<?php echo esc_attr($single_property->id); ?>"><?php else: ?><label>Property<select name="hotel_id" required><option value="">Select</option><?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>" <?php selected($edit->hotel_id??0,$h->id); ?>><?php echo esc_html($h->name); ?></option><?php endforeach; ?></select></label><?php endif; ?><label>Floor<select name="floor_id" required><option value="">Select</option><?php foreach($floors as $f): ?><option value="<?php echo esc_attr($f->id); ?>" <?php selected($edit->floor_id??0,$f->id); ?>><?php echo esc_html($single_property ? $f->name : ($f->hotel_name.' – '.$f->name)); ?></option><?php endforeach; ?></select></label><label>Asset Name / Number<input name="room_no" required value="<?php echo esc_attr($edit->room_no??''); ?>"></label><label>Asset Type<select name="asset_type_id" required><option value="">Select Asset Type</option><?php foreach($asset_types as $asset_type): ?><option value="<?php echo esc_attr($asset_type->id); ?>" <?php selected($edit->asset_type_id??0,$asset_type->id); ?>><?php echo esc_html($asset_type->name); ?></option><?php endforeach; ?></select></label></div><label>Applicable Inspection Templates<select name="template_ids[]" id="hrim-room-templates" multiple size="8"><?php foreach($templates as $t): ?><option value="<?php echo esc_attr($t->id); ?>" <?php selected(in_array((int)$t->id,$selected_templates,true)); ?>><?php echo esc_html($t->name); ?></option><?php endforeach; ?></select></label>
+        <?php echo $this->master_import_feedback('rooms'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('rooms'); ?><?php echo $this->excel_button('rooms'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-rooms'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Asset</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><?php if(!$single_property): ?><th>Property</th><?php endif; ?><th>Floor</th><th>Asset</th><th>Asset Type</th><th>Sections</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rooms as $r): ?><tr><td><?php echo ++$sl; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name); ?></td><td><strong><?php echo esc_html($r->room_no); ?></strong></td><td><?php echo esc_html($r->asset_type_name?:'Asset'); ?></td><td><?php echo esc_html($r->effective_section_names?:'No section selected'); ?></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('room',$r->id,'hotel-inspection-rooms'); ?></td></tr><?php endforeach; ?><?php if(!$rooms): ?><tr><td colspan="<?php echo $single_property?7:8; ?>" class="hrim-empty">No assets found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card hrim-modal-wide"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-rooms')); ?>">×</a><h2><?php echo $edit?'Edit Asset':'Add Asset'; ?></h2><form class="hrim-form hrim-asset-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_room"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_room'); ?><div class="hrim-grid-2"><?php if($single_property): ?><input type="hidden" name="hotel_id" value="<?php echo esc_attr($single_property->id); ?>"><?php else: ?><label>Property<select name="hotel_id" required><option value="">Select</option><?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>" <?php selected($edit->hotel_id??0,$h->id); ?>><?php echo esc_html($h->name); ?></option><?php endforeach; ?></select></label><?php endif; ?><label>Floor<select name="floor_id" required><option value="">Select</option><?php foreach($floors as $f): ?><option value="<?php echo esc_attr($f->id); ?>" <?php selected($edit->floor_id??0,$f->id); ?>><?php echo esc_html($single_property ? $f->name : ($f->hotel_name.' – '.$f->name)); ?></option><?php endforeach; ?></select></label><label>Asset Name / Number<input name="room_no" required value="<?php echo esc_attr($edit->room_no??''); ?>"></label><label>Asset Type<select name="asset_type_id" required><option value="">Select Asset Type</option><?php foreach($asset_types as $asset_type): ?><option value="<?php echo esc_attr($asset_type->id); ?>" <?php selected($edit->asset_type_id??0,$asset_type->id); ?>><?php echo esc_html($asset_type->name); ?></option><?php endforeach; ?></select></label></div><label>Sections *<select name="section_ids[]" id="hrim-room-sections" multiple size="8" required><?php foreach($sections as $section): ?><option value="<?php echo esc_attr($section->id); ?>" <?php selected(in_array((int)$section->id,$selected_section_ids,true)); ?>><?php echo esc_html($section->name.' ('.$section->point_count.' checkpoints)'); ?></option><?php endforeach; ?></select></label>
         <?php if($edit_id): ?>
         <div class="hrim-subpanel hrim-asset-checkpoint-preview">
             <h3>Applicable Checkpoints</h3>
             <?php if($available_room_questions): ?>
                 <div class="hrim-table-wrap">
                     <table class="hrim-table hrim-applicable-checkpoints-table">
-                        <colgroup><col class="hrim-checkpoint-col-main"><col class="hrim-checkpoint-col-show"><col class="hrim-checkpoint-col-action"></colgroup>
-                        <thead><tr><th>Checkpoint</th><th class="hrim-checkpoint-show-col"><span class="hrim-checkpoint-header-text">Show</span><span class="hrim-checkpoint-header-icon dashicons dashicons-visibility" aria-hidden="true"></span></th><th class="hrim-checkpoint-action-col"><span class="hrim-checkpoint-header-text">Action</span><span class="hrim-checkpoint-header-icon dashicons dashicons-no-alt" aria-hidden="true"></span></th></tr></thead>
+                        <colgroup><col class="hrim-checkpoint-col-main"><col class="hrim-checkpoint-col-department"><col class="hrim-checkpoint-col-show"><col class="hrim-checkpoint-col-action"></colgroup>
+                        <thead><tr><th>Checkpoint</th><th>Department</th><th class="hrim-checkpoint-show-col"><span class="hrim-checkpoint-header-text">Show</span><span class="hrim-checkpoint-header-icon dashicons dashicons-visibility" aria-hidden="true"></span></th><th class="hrim-checkpoint-action-col"><span class="hrim-checkpoint-header-text">Action</span><span class="hrim-checkpoint-header-icon dashicons dashicons-no-alt" aria-hidden="true"></span></th></tr></thead>
                         <input type="hidden" name="hrim_manage_additional_checkpoints" value="1">
                         <tbody>
                         <?php
@@ -885,7 +1305,7 @@ class HRIM_Core {
                         ?>
                             <?php if($preview_section_id!==(int)$checkpoint->section_id): $preview_section_id=(int)$checkpoint->section_id; ?>
                                 <tr class="hrim-applicable-section-row" data-section-id="<?php echo esc_attr($preview_section_id); ?>">
-                                    <td colspan="3">
+                                    <td colspan="4">
                                         <div class="hrim-applicable-section-heading">
                                             <span><?php echo esc_html($checkpoint->section_name); ?></span>
                                             <button type="button" class="hrim-section-add-checkpoint" data-section-id="<?php echo esc_attr($preview_section_id); ?>" title="Add checkpoint under <?php echo esc_attr($checkpoint->section_name); ?>" aria-label="Add checkpoint under <?php echo esc_attr($checkpoint->section_name); ?>"><span class="dashicons dashicons-plus-alt2"></span></button>
@@ -899,13 +1319,15 @@ class HRIM_Core {
                                             <input type="hidden" name="additional_section_id[]" value="<?php echo esc_attr($preview_section_id); ?>">
                                             <input class="hrim-custom-checkpoint-input" type="text" name="additional_question[]" required value="<?php echo esc_attr($custom_checkpoint->question); ?>" aria-label="Edit checkpoint">
                                         </td>
+                                        <td class="hrim-col-department">—</td>
                                         <td class="hrim-checkpoint-show-col"><input type="checkbox" checked disabled aria-label="Show <?php echo esc_attr($custom_checkpoint->question); ?>"></td>
                                         <td class="hrim-checkpoint-action-col"><button type="submit" class="hrim-delete-custom-checkpoint" name="delete_additional_checkpoint_id" value="<?php echo esc_attr($custom_checkpoint->addition_id); ?>" formnovalidate title="Permanently delete this checkpoint from this asset" aria-label="Permanently delete this checkpoint from this asset" onclick="return confirm('Permanently delete this checkpoint from this asset?');"><span class="dashicons dashicons-no-alt"></span></button></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                             <tr data-section-id="<?php echo esc_attr($preview_section_id); ?>">
-                                <td><?php echo esc_html($checkpoint->question); ?></td>
+                                <td><input type="hidden" name="managed_question_ids[]" value="<?php echo esc_attr($checkpoint->id); ?>"><?php echo esc_html($checkpoint->question); ?></td>
+                                <td class="hrim-col-department"><?php echo esc_html($checkpoint->department_name ?: '—'); ?></td>
                                 <td class="hrim-checkpoint-show-col"><input type="checkbox" name="included_question_ids[]" value="<?php echo esc_attr($checkpoint->id); ?>" <?php checked(!in_array((int)$checkpoint->id,$excluded_question_ids,true)); ?> aria-label="Show <?php echo esc_attr($checkpoint->question); ?>"></td>
                                 <td class="hrim-checkpoint-action-col"><button type="submit" class="hrim-delete-custom-checkpoint" name="delete_standard_checkpoint_id" value="<?php echo esc_attr($checkpoint->id); ?>" formnovalidate title="Remove this checkpoint from this asset" aria-label="Remove this checkpoint from this asset" onclick="return confirm('Permanently delete this checkpoint from this asset and its backend asset data?');"><span class="dashicons dashicons-no-alt"></span></button></td>
                             </tr>
@@ -914,7 +1336,7 @@ class HRIM_Core {
                     </table>
                 </div>
             <?php else: ?>
-                <div class="hrim-empty">No checkpoints are available under the selected inspection templates.</div>
+                <div class="hrim-empty">Select one or more sections and save the asset to view its checkpoints.</div>
             <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -927,11 +1349,10 @@ class HRIM_Core {
         global $wpdb;
         $edit_id=absint($_GET['edit']??0); $show_form=isset($_GET['add'])||$edit_id;
         $edit=$edit_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_sections WHERE id=%d",$edit_id)):null;
-        $rows=$wpdb->get_results("SELECT s.*,d.name department_name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_questions q WHERE q.section_id=s.id) point_count FROM {$wpdb->prefix}hrim_sections s LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=s.department_id ORDER BY s.sort_order,s.name,s.id");
-        $departments=$this->active_departments();
+        $rows=$wpdb->get_results("SELECT s.*,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_questions q WHERE q.section_id=s.id AND q.is_library=1) point_count FROM {$wpdb->prefix}hrim_sections s ORDER BY s.sort_order,s.name,s.id");
         ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('checklist-sections'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-checklist-sections'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Section</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Date</th><th>Section</th><th>Department</th><th>Description</th><th>Display Order</th><th>Checklist Points</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><td><strong><?php echo esc_html($r->name); ?></strong></td><td><?php echo esc_html($r->department_name?:'General'); ?></td><td><?php echo esc_html($r->description); ?></td><td><?php echo esc_html($r->sort_order); ?></td><td><?php echo esc_html($r->point_count); ?></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('section',$r->id,'hotel-inspection-checklist-sections'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">No checklist sections found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-checklist-sections')); ?>">×</a><h2><?php echo $edit?'Edit Checklist Section':'Add Checklist Section'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_section"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_section'); ?><label>Section Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Department<select name="department_id" required><option value="">Select Department</option><?php foreach($departments as $department): ?><option value="<?php echo esc_attr($department->id); ?>" <?php selected($edit->department_id??0,$department->id); ?>><?php echo esc_html($department->name); ?></option><?php endforeach; ?></select></label><label>Description<textarea name="description"><?php echo esc_textarea($edit->description??''); ?></textarea></label><label>Display Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
+        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('checklist-sections'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-checklist-sections'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Section</a></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-sections-master-table"><colgroup><col class="hrim-sections-date-width"><col class="hrim-sections-name-width"><col class="hrim-sections-order-width"><col class="hrim-sections-points-width"><col class="hrim-sections-status-width"><col class="hrim-sections-actions-width"></colgroup><thead><tr><th class="hrim-sections-date-col">Date</th><th class="hrim-sections-name-col">Section</th><th>Display Order</th><th>Checklist Points</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td class="hrim-sections-date-col"><span class="hrim-date-value"><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></span></td><td class="hrim-sections-name-col"><strong><?php echo esc_html($r->name); ?></strong></td><td><?php echo esc_html($r->sort_order); ?></td><td><?php echo esc_html($r->point_count); ?></td><td><span class="hrim-badge <?php echo $r->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($r->status)); ?></span></td><td><?php echo $this->action_buttons('section',$r->id,'hotel-inspection-checklist-sections'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="6" class="hrim-empty">No checklist sections found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-checklist-sections')); ?>">×</a><h2><?php echo $edit?'Edit Checklist Section':'Add Checklist Section'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_section"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_section'); ?><label>Section Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Display Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit->sort_order??0); ?>"></label><label>Status<select name="status"><option value="active" <?php selected($edit->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
         <?php return $this->shell('Checklist Sections',ob_get_clean(),'sections');
     }
 
@@ -947,7 +1368,7 @@ class HRIM_Core {
         $selected_sections=$et?array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_template_sections WHERE template_id=%d ORDER BY sort_order,section_id",$et))):[];
         $qs=$wpdb->get_results("SELECT q.*,s.name section_display FROM {$wpdb->prefix}hrim_questions q LEFT JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE q.is_library=1 ORDER BY COALESCE(s.sort_order,999999),s.name,q.sort_order,q.id");
         ob_start(); ?>
-        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('inspection-templates'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add_template','1',$this->page_url('hotel-inspection-templates'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Template</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Date</th><th>Name</th><th>Sections</th><th>Checklist Points</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($templates as $t): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($t->created_at)?esc_html($this->ist_date('d/m/y',$t->created_at)):'—'; ?></td><td><strong><?php echo esc_html($t->name); ?></strong></td><td><?php echo esc_html($t->section_count); ?></td><td><?php echo esc_html($t->point_count); ?></td><td><span class="hrim-badge <?php echo $t->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($t->status)); ?></span></td><td><?php echo $this->action_buttons('template',$t->id,'hotel-inspection-templates','edit_template'); ?></td></tr><?php endforeach; ?><?php if(!$templates): ?><tr><td colspan="9" class="hrim-empty">No templates found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('inspection-templates'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add_template','1',$this->page_url('hotel-inspection-templates'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Template</a></div></div><div class="hrim-table-wrap"><table class="hrim-table hrim-templates-list-table"><thead><tr><th>Sl.</th><th>Date</th><th>Name</th><th>Section</th><th>Checklist Point</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($templates as $t): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($t->created_at)?esc_html($this->ist_date('d/m/y',$t->created_at)):'—'; ?></td><td><strong><?php echo esc_html($t->name); ?></strong></td><td><?php echo esc_html($t->section_count); ?></td><td><?php echo esc_html($t->point_count); ?></td><td><span class="hrim-badge <?php echo $t->status==='active'?'success':''; ?>"><?php echo esc_html(ucfirst($t->status)); ?></span></td><td><?php echo $this->action_buttons('template',$t->id,'hotel-inspection-templates','edit_template'); ?></td></tr><?php endforeach; ?><?php if(!$templates): ?><tr><td colspan="9" class="hrim-empty">No templates found.</td></tr><?php endif; ?></tbody></table></div></div>
         <?php if($show_t): ?><div class="hrim-modal open"><div class="hrim-modal-card hrim-modal-wide"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-templates')); ?>">×</a><h2><?php echo $edit_t?'Edit Template':'Create Template'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_template"><input type="hidden" name="id" value="<?php echo esc_attr($et); ?>"><?php wp_nonce_field('hrim_save_template'); ?><label>Template Name<input name="name" required value="<?php echo esc_attr($edit_t->name??''); ?>"></label><div><div class="hrim-section-picker"><?php foreach($sections as $section): ?><label class="hrim-section-option"><input type="checkbox" name="section_ids[]" value="<?php echo esc_attr($section->id); ?>" <?php checked(in_array((int)$section->id,$selected_sections,true)); ?>><span><strong><?php echo esc_html($section->name); ?></strong><small><?php echo esc_html($section->point_count); ?> checkpoints</small></span></label><?php endforeach; ?><?php if(!$sections): ?><div class="hrim-empty">Create checklist sections first.</div><?php endif; ?></div></div><label>Status<select name="status"><option value="active" <?php selected($edit_t->status??'active','active'); ?>>Active</option><option value="inactive" <?php selected($edit_t->status??'active','inactive'); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit_t?'Update Template':'Create Template'; ?></button></div></form></div></div><?php endif; ?>
         <?php if($show_q): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-templates')); ?>">×</a><h2><?php echo $edit_q?'Edit Section Checkpoint':'Add Section Checkpoint'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_question"><input type="hidden" name="id" value="<?php echo esc_attr($eq); ?>"><?php wp_nonce_field('hrim_save_question'); ?><label>Section<select name="section_id" required><option value="">Select Section</option><?php foreach($sections as $section): ?><option value="<?php echo esc_attr($section->id); ?>" <?php selected($edit_q->section_id??0,$section->id); ?>><?php echo esc_html($section->name); ?></option><?php endforeach; ?></select></label><label>Checkpoint<textarea name="question" required><?php echo esc_textarea($edit_q->question??''); ?></textarea></label><label>Response Type<select name="question_type"><option value="yes_no" <?php selected($edit_q->question_type??'yes_no','yes_no'); ?>>Yes / No / N.A.</option><option value="rating" <?php selected($edit_q->question_type??'','rating'); ?>>Rating 1–5</option><option value="text" <?php selected($edit_q->question_type??'','text'); ?>>Text</option></select></label><label>Display Order<input type="number" name="sort_order" value="<?php echo esc_attr($edit_q->sort_order??0); ?>"></label><label class="hrim-check"><input type="checkbox" name="required_flag" value="1" <?php checked($edit_q->required_flag??0,1); ?>> Mandatory</label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit_q?'Update Checkpoint':'Add Checkpoint'; ?></button></div></form></div></div><?php endif; ?>
         <?php return $this->shell('Inspection Templates',ob_get_clean(),'templates');
@@ -958,11 +1379,16 @@ class HRIM_Core {
         global $wpdb;
         $hotels=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_hotels WHERE status='active' ORDER BY name");
         $draft_batch=sanitize_text_field(wp_unslash($_GET['draft']??''));
-        $draft_room_id=0; $draft_answers=[]; $draft_overall_remarks='';
+        $draft_room_id=0; $draft_hotel_id=0; $draft_answers=[]; $draft_overall_remarks='';
         if($draft_batch){
-            $draft_rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_inspections WHERE draft_batch_id=%s AND status='in_progress' AND inspector_id=%d ORDER BY id",$draft_batch,get_current_user_id()));
+            if($this->can_manage()){
+                $draft_rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_inspections WHERE draft_batch_id=%s AND status='in_progress' ORDER BY id",$draft_batch));
+            }else{
+                $draft_rows=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_inspections WHERE draft_batch_id=%s AND status='in_progress' AND inspector_id=%d ORDER BY id",$draft_batch,get_current_user_id()));
+            }
             if($draft_rows){
                 $draft_room_id=(int)$draft_rows[0]->room_id;
+                $draft_hotel_id=(int)$draft_rows[0]->hotel_id;
                 $draft_overall_remarks=(string)$draft_rows[0]->remarks;
                 foreach($draft_rows as $dr){
                     $ans=$wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_answers WHERE inspection_id=%d",$dr->id));
@@ -972,7 +1398,9 @@ class HRIM_Core {
                             'result'=>$a->result_status,
                             'remarks'=>$a->remarks,
                             'attachments'=>$this->normalize_attachment_ids($a->attachment_ids),
+                            'attachment_urls'=>array_values(array_filter(array_map('wp_get_attachment_url',$this->normalize_attachment_ids($a->attachment_ids)))),
                             'videos'=>$this->normalize_attachment_ids($a->video_attachment_ids??''),
+                            'video_urls'=>array_values(array_filter(array_map('wp_get_attachment_url',$this->normalize_attachment_ids($a->video_attachment_ids??'')))),
                         ];
                     }
                 }
@@ -984,18 +1412,25 @@ class HRIM_Core {
           <input type="hidden" name="action" value="hrim_submit_inspection">
           <input type="hidden" name="draft_batch_id" id="hrimDraftBatchId" value="<?php echo esc_attr($draft_batch); ?>">
           <?php wp_nonce_field('hrim_submit_inspection'); ?>
-          <?php $single_property=$this->single_active_property(); ?>
+          <?php
+          $single_property=$this->single_active_property();
+          $initial_hotel_id=$draft_hotel_id ?: ($single_property ? (int)$single_property->id : 0);
+          $initial_assets=[];
+          if($initial_hotel_id){
+              $initial_assets=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.room_no,CASE WHEN at.name IS NULL OR TRIM(at.name)='' OR LOWER(TRIM(at.name)) IN ('asset','assets','room','rooms') THEN 'Room' ELSE at.name END asset_type_name FROM {$wpdb->prefix}hrim_rooms r LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' ORDER BY f.sort_order,r.room_no",$initial_hotel_id));
+          }
+          ?>
           <div class="<?php echo $single_property?'':'hrim-grid-2'; ?>">
-            <?php if($single_property): ?><input type="hidden" id="hrimHotel" name="hotel_id" value="<?php echo esc_attr($single_property->id); ?>"><?php else: ?>
-            <label>Hotel<select id="hrimHotel" name="hotel_id" required><option value="">Select hotel</option><?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>"><?php echo esc_html($h->name); ?></option><?php endforeach; ?></select></label><?php endif; ?>
-            <label>Room<select id="hrimRoom" name="room_id" required data-draft-room="<?php echo esc_attr($draft_room_id); ?>"><option value=""><?php echo $single_property?'Select Room':'Select hotel first'; ?></option></select></label>
+            <?php if($single_property): ?><input type="hidden" id="hrimHotel" name="hotel_id" value="<?php echo esc_attr($initial_hotel_id ?: $single_property->id); ?>"><?php else: ?>
+            <label>Hotel<select id="hrimHotel" name="hotel_id" required><option value="">Select hotel</option><?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>" <?php selected($initial_hotel_id,$h->id); ?>><?php echo esc_html($h->name); ?></option><?php endforeach; ?></select></label><?php endif; ?>
+            <label>Asset<select id="hrimRoom" name="room_id" required data-placeholder="Select" data-draft-room="<?php echo esc_attr($draft_room_id); ?>"><option value="">Select</option><?php foreach($initial_assets as $asset): $type_name=trim((string)$asset->asset_type_name)?:'Room'; ?><option value="<?php echo esc_attr($asset->id); ?>" <?php selected($draft_room_id,$asset->id); ?>><?php echo esc_html($type_name.' - '.$asset->room_no); ?></option><?php endforeach; ?></select></label>
           </div>
           <div id="hrimQuestions" class="hrim-question-list"></div>
           <div id="hrimInspectionFooter" class="hrim-inspection-footer" <?php echo $draft_room_id ? '' : 'style="display:none;"'; ?>>
-            <label>Overall Remarks<textarea name="remarks" rows="4"><?php echo esc_textarea($draft_overall_remarks); ?></textarea></label>
             <div class="hrim-form-actions hrim-inspection-actions">
               <button class="hrim-secondary hrim-large hrim-save-progress" type="submit" name="save_mode" value="in_progress" formnovalidate>Save In Progress</button>
-              <button class="hrim-primary hrim-large hrim-submit-complete" type="submit" name="save_mode" value="complete" hidden>Submit All Checklists</button>
+              <button class="hrim-primary hrim-large hrim-submit-complete" type="submit" name="save_mode" value="complete" hidden>Submit Inspection</button>
+            </div>
             </div>
           </div>
         </form></div>
@@ -1009,8 +1444,8 @@ class HRIM_Core {
         $where=$this->can_manage()?"i.status='in_progress'":"i.status='in_progress' AND i.inspector_id=".get_current_user_id();
         $rows=$wpdb->get_results("SELECT i.draft_batch_id,MIN(i.started_at) started_at,MAX(i.last_saved_at) last_saved_at,MAX(i.room_id) room_id,MAX(i.inspector_id) inspector_id,r.room_no,f.name floor_name,u.display_name inspector FROM {$wpdb->prefix}hrim_inspections i LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=i.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=i.floor_id LEFT JOIN {$wpdb->users} u ON u.ID=i.inspector_id WHERE {$where} AND i.draft_batch_id IS NOT NULL AND i.draft_batch_id<>'' GROUP BY i.draft_batch_id ORDER BY last_saved_at DESC");
         ob_start(); ?>
-        <div class="hrim-panel"><div class="hrim-panel-head"><div><small><?php echo count($rows); ?> records</small></div><?php echo $this->excel_button('inspection-in-progress'); ?></div>
-        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><th>Floor</th><th>Room</th><th>Inspector</th><th>Completed</th><th>Progress</th><th>Last Updated</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
+        <div class="hrim-panel hrim-inspection-progress-list-panel"><div class="hrim-table-tools hrim-inspection-progress-tools"><input type="search" class="hrim-table-search" placeholder=""><?php echo $this->excel_button('inspection-in-progress'); ?></div>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><th>Floor</th><th>Room</th><th>Inspector</th><th>Count</th><th>Progress</th><th>Last Updated</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
         <?php $sl=0; foreach($rows as $r):
             $checklist=$this->in_progress_room_checklist((int)$r->room_id,(string)$r->draft_batch_id);
             $total_count=0; $answered_count=0;
@@ -1023,11 +1458,11 @@ class HRIM_Core {
             }
             $pct=$total_count?round(($answered_count/$total_count)*100):0;
             $detail_id='hrimDraftDetail'.substr(md5((string)$r->draft_batch_id),0,12);
-        ?><tr class="hrim-in-progress-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($detail_id); ?>"><td><?php echo ++$sl; ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->started_at?:$r->last_saved_at)); ?></td><td><?php echo esc_html($r->floor_name); ?></td><td><?php echo esc_html($r->room_no); ?></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($answered_count.' / '.$total_count); ?></td><td><strong><?php echo esc_html($pct); ?>%</strong></td><td><?php echo esc_html($this->ist_date('d/m/y, h:i A',$r->last_saved_at)); ?></td><td class="hrim-no-export"><div class="hrim-actions"><a class="hrim-icon-btn hrim-action-edit" title="Continue Inspection" href="<?php echo esc_url(add_query_arg('draft',$r->draft_batch_id,$this->page_url('perform-room-inspection'))); ?>"><span class="dashicons dashicons-edit"></span></a><?php if($this->can_manage()): ?><form class="hrim-inline" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this in-progress inspection?');"><input type="hidden" name="action" value="hrim_delete_in_progress"><input type="hidden" name="draft_batch_id" value="<?php echo esc_attr($r->draft_batch_id); ?>"><?php wp_nonce_field('hrim_delete_in_progress'); ?><button class="hrim-icon-btn hrim-delete" title="Delete Draft"><span class="dashicons dashicons-trash"></span></button></form><?php endif; ?></div></td></tr>
+        ?><tr class="hrim-in-progress-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($detail_id); ?>"><td><?php echo ++$sl; ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->started_at?:$r->last_saved_at)); ?></td><td><?php echo esc_html($r->floor_name); ?></td><td><?php echo esc_html($r->room_no); ?></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($answered_count.' / '.$total_count); ?></td><td><strong><?php echo esc_html($pct); ?>%</strong></td><td><?php echo esc_html($this->ist_date('d/m/y, h:i A',$r->last_saved_at)); ?></td><td class="hrim-no-export"><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-view hrim-in-progress-view" data-target="<?php echo esc_attr($detail_id); ?>" title="View Inspection" aria-label="View Inspection"><span class="dashicons dashicons-visibility"></span></button><a class="hrim-icon-btn hrim-action-edit" title="Continue Inspection" href="<?php echo esc_url(add_query_arg('draft',$r->draft_batch_id,$this->page_url('perform-room-inspection'))); ?>"><span class="dashicons dashicons-edit"></span></a><?php if($this->can_manage()): ?><form class="hrim-inline" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this in-progress inspection?');"><input type="hidden" name="action" value="hrim_delete_in_progress"><input type="hidden" name="draft_batch_id" value="<?php echo esc_attr($r->draft_batch_id); ?>"><?php wp_nonce_field('hrim_delete_in_progress'); ?><button class="hrim-icon-btn hrim-delete" title="Delete Draft"><span class="dashicons dashicons-trash"></span></button></form><?php endif; ?></div></td></tr>
         <?php echo $this->in_progress_detail_row($r,$detail_id); endforeach; ?>
         <?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">Inspection records not found.</td></tr><?php endif; ?>
-        </tbody></table></div></div>
-        <?php return $this->shell('Inspection In Progress',ob_get_clean(),'in_progress');
+        </tbody></table></div><div class="hrim-table-meta"><?php echo count($rows); ?> records</div></div>
+        <?php return $this->shell('Inspection Started but Completed',ob_get_clean(),'in_progress');
     }
 
     private function in_progress_room_checklist($room_id,$draft_batch){
@@ -1036,42 +1471,31 @@ class HRIM_Core {
         if(isset($cache[$cache_key])) return $cache[$cache_key];
 
         global $wpdb;
-        $room=$wpdb->get_row($wpdb->prepare("SELECT id,category_id FROM {$wpdb->prefix}hrim_rooms WHERE id=%d",(int)$room_id));
+        $room=$wpdb->get_row($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_rooms WHERE id=%d",(int)$room_id));
         if(!$room) return $cache[$cache_key]=[];
 
-        $template_ids=array_map('intval',$wpdb->get_col($wpdb->prepare(
-            "SELECT template_id FROM {$wpdb->prefix}hrim_room_templates WHERE room_id=%d
-             UNION
-             SELECT ct.template_id FROM {$wpdb->prefix}hrim_category_templates ct
-             WHERE ct.category_id=%d AND NOT EXISTS (
-                SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions x
-                WHERE x.room_id=%d AND x.template_id=ct.template_id
-             )",
-            (int)$room_id,(int)$room->category_id,(int)$room_id
-        )));
-        $template_ids=array_values(array_unique(array_filter($template_ids)));
+        $section_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_room_sections WHERE room_id=%d ORDER BY sort_order,section_id",(int)$room_id)));
 
         $sections=[];
         $questions=[];
-        if($template_ids){
-            $ph=implode(',',array_fill(0,count($template_ids),'%d'));
+        if($section_ids){
+            $ph=implode(',',array_fill(0,count($section_ids),'%d'));
             $sections=$wpdb->get_results($wpdb->prepare(
                 "SELECT DISTINCT s.id,s.name,s.sort_order
-                 FROM {$wpdb->prefix}hrim_template_sections ts
-                 INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=ts.section_id AND s.status='active'
-                 WHERE ts.template_id IN ($ph)
+                 FROM {$wpdb->prefix}hrim_sections s
+                 WHERE s.id IN ($ph) AND s.status='active'
                  ORDER BY s.sort_order,s.name,s.id",
-                $template_ids
+                $section_ids
             ));
             $questions=$wpdb->get_results($wpdb->prepare(
                 "SELECT DISTINCT q.id,q.question,q.section_id,s.name section_name,s.sort_order section_order,q.sort_order
-                 FROM {$wpdb->prefix}hrim_template_sections ts
-                 INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=ts.section_id AND s.status='active'
+                 FROM {$wpdb->prefix}hrim_sections s
                  INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1
                  LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id
-                 WHERE ts.template_id IN ($ph) AND rx.question_id IS NULL
+                 LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id
+                 WHERE s.id IN ($ph) AND s.status='active' AND rx.question_id IS NULL AND rr.question_id IS NULL
                  ORDER BY s.sort_order,s.name,q.sort_order,q.id",
-                array_merge([(int)$room_id],$template_ids)
+                array_merge([(int)$room_id,(int)$room_id],$section_ids)
             ));
         }
 
@@ -1120,9 +1544,9 @@ class HRIM_Core {
         $grouped=$this->in_progress_room_checklist((int)$draft->room_id,(string)$draft->draft_batch_id);
 
         ob_start(); ?>
-        <tr id="<?php echo esc_attr($detail_id); ?>" class="hrim-in-progress-detail-row hrim-no-export" hidden><td colspan="9"><div class="hrim-inspection-detail hrim-in-progress-inline-detail">
-        <section class="hrim-section-score-card"><div class="hrim-table-wrap"><table class="hrim-table hrim-section-score-table"><thead><tr><th>Section</th><th>Total</th><th>Answered</th><th>Pending</th><th>Progress</th></tr></thead><tbody>
-        <?php if(!$grouped): ?><tr><td colspan="5" class="hrim-empty">No checklist sections are assigned to this room.</td></tr><?php endif; ?>
+        <tr id="<?php echo esc_attr($detail_id); ?>" class="hrim-in-progress-detail-row hrim-no-export" hidden><td class="hrim-in-progress-detail-cell" colspan="9" data-desktop-colspan="9" data-mobile-colspan="3"><div class="hrim-inspection-detail hrim-in-progress-inline-detail">
+        <section class="hrim-section-score-card"><div class="hrim-table-wrap"><table class="hrim-table hrim-section-score-table"><thead><tr><th>Section</th><th>Total</th><th>Answered</th><th>Pending</th></tr></thead><tbody>
+        <?php if(!$grouped): ?><tr><td colspan="4" class="hrim-empty">No checklist sections are assigned to this room.</td></tr><?php endif; ?>
         <?php $section_index=0; foreach($grouped as $section=>$section_items):
             $total=count($section_items);
             $answered=0;
@@ -1134,18 +1558,73 @@ class HRIM_Core {
             $percentage=$total?round(($answered/$total)*100):0;
             $panel_id=$detail_id.'_section_'.$section_index++;
         ?>
-        <tr class="hrim-section-score-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($panel_id); ?>"><td><strong><?php echo esc_html($section); ?></strong><span class="hrim-section-row-arrow" aria-hidden="true">&#9662;</span></td><td><?php echo esc_html($total); ?></td><td><?php echo esc_html($answered); ?></td><td><?php echo esc_html($pending); ?></td><td><span class="hrim-section-percentage"><?php echo esc_html($percentage); ?>%</span></td></tr>
-        <tr class="hrim-section-detail-row"><td colspan="5"><div id="<?php echo esc_attr($panel_id); ?>" class="hrim-section-detail-panel" hidden>
+        <tr class="hrim-section-score-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($panel_id); ?>"><td><strong><?php echo esc_html($section); ?></strong><span class="hrim-section-row-arrow" aria-hidden="true">&#9662;</span></td><td><?php echo esc_html($total); ?></td><td><?php echo esc_html($answered); ?></td><td><?php echo esc_html($pending); ?></td></tr>
+        <tr class="hrim-section-detail-row" hidden><td colspan="4"><div id="<?php echo esc_attr($panel_id); ?>" class="hrim-section-detail-panel" hidden>
+        <div class="hrim-table-wrap hrim-in-progress-checkpoint-wrap"><table class="hrim-table hrim-in-progress-checkpoint-table"><thead><tr><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-answer">Answer</th><th class="hrim-col-remarks">Remarks</th><th class="hrim-col-photo">Photo</th><th class="hrim-col-status">Status</th></tr></thead><tbody>
         <?php foreach($section_items as $item):
             $question=$item[0];
             $a=$item[1];
             $value=$a?strtolower(trim((string)$a->answer_text)):'';
             $is_unanswered=$value==='';
             $is_fail=$a && ($value==='no'||strtolower((string)$a->result_status)==='fail');
+            $photo_ids=$a?$this->normalize_attachment_ids($a->attachment_ids):[];
         ?>
-        <div class="hrim-detail-answer <?php echo $is_unanswered?'is-na':($is_fail?'is-fail':'is-pass'); ?>"><div class="hrim-answer-icon"><span class="dashicons <?php echo $is_unanswered?'dashicons-minus':($is_fail?'dashicons-no-alt':'dashicons-yes-alt'); ?>"></span></div><div><strong><?php echo esc_html($question->question?:'Checkpoint'); ?></strong><div class="hrim-answer-value">Answer: <?php echo esc_html($is_unanswered?'Not answered':ucfirst($a->answer_text)); ?></div><?php if($a && trim((string)$a->remarks)!==''): ?><p><b>Remarks:</b> <?php echo nl2br(esc_html($a->remarks)); ?></p><?php endif; ?><?php $photo_ids=$a?$this->normalize_attachment_ids($a->attachment_ids):[]; if($photo_ids): ?><div class="hrim-draft-photo-list"><?php foreach($photo_ids as $photo_id): $url=wp_get_attachment_image_url($photo_id,'thumbnail'); if($url): ?><a href="<?php echo esc_url(wp_get_attachment_url($photo_id)); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($url); ?>" alt="Checkpoint photo"></a><?php endif; endforeach; ?></div><?php endif; ?></div></div>
-        <?php endforeach; ?></div></td></tr><?php endforeach; ?>
-        </tbody></table></div></section></div></td></tr>
+        <tr class="<?php echo $is_unanswered?'is-na':($is_fail?'is-fail':'is-pass'); ?>"><td class="hrim-checkpoint-text-cell"><?php echo esc_html($question->question?:'Checkpoint'); ?></td><td class="hrim-checkpoint-answer-cell"><?php echo esc_html($is_unanswered?'No':ucfirst($a->answer_text)); ?></td><td class="hrim-checkpoint-remarks-cell"><?php echo ($a && trim((string)$a->remarks)!=='')?nl2br(esc_html($a->remarks)):'—'; ?></td><td class="hrim-checkpoint-photo-cell"><?php if($photo_ids): ?><div class="hrim-draft-photo-list"><?php foreach($photo_ids as $photo_id): $url=wp_get_attachment_image_url($photo_id,'thumbnail'); if($url): ?><a href="<?php echo esc_url(wp_get_attachment_url($photo_id)); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($url); ?>" alt="Checkpoint photo" loading="lazy" decoding="async"></a><?php endif; endforeach; ?></div><?php else: ?>—<?php endif; ?></td><td class="hrim-checkpoint-status-cell"><span class="hrim-answer-icon"><span class="dashicons <?php echo $is_unanswered?'dashicons-minus':($is_fail?'dashicons-no-alt':'dashicons-yes-alt'); ?>"></span></span></td></tr>
+        <?php endforeach; ?></tbody></table></div></div></td></tr><?php endforeach; ?>
+        </tbody></table></div></section>
+
+        <section class="hrim-mobile-section-summary" aria-label="Inspection section summary">
+          <div class="hrim-mobile-section-summary-head">
+            <div>Section</div><div>Total</div><div>Answered</div><div>Pending</div>
+          </div>
+          <?php $mobile_section_index=0; foreach($grouped as $mobile_section=>$mobile_items):
+              $mobile_total=count($mobile_items);
+              $mobile_answered=0;
+              foreach($mobile_items as $mobile_item){
+                  $mobile_saved=$mobile_item[1];
+                  if($mobile_saved && in_array(strtolower(trim((string)$mobile_saved->answer_text)),['yes','no'],true)) $mobile_answered++;
+              }
+              $mobile_pending=max(0,$mobile_total-$mobile_answered);
+              $mobile_panel_id=$detail_id.'_mobile_section_'.$mobile_section_index++;
+          ?>
+          <button type="button" class="hrim-mobile-section-summary-row" data-target="<?php echo esc_attr($mobile_panel_id); ?>" aria-expanded="false">
+            <span class="hrim-mobile-section-name"><?php echo esc_html($mobile_section); ?><span class="hrim-mobile-section-arrow" aria-hidden="true">&#9662;</span></span>
+            <span><?php echo esc_html($mobile_answered.'/'.$mobile_total); ?></span>
+            <span><?php echo esc_html($mobile_answered); ?></span>
+            <span><?php echo esc_html($mobile_pending); ?></span>
+          </button>
+          <div id="<?php echo esc_attr($mobile_panel_id); ?>" class="hrim-mobile-section-detail" hidden>
+            <div class="hrim-mobile-checkpoint-grid-scroll">
+            <div class="hrim-mobile-checkpoint-grid" role="table" aria-label="Checkpoint details">
+              <div class="hrim-mobile-checkpoint-grid-row hrim-mobile-checkpoint-grid-head" role="row">
+                <div role="columnheader">Checkpoint</div>
+                <div role="columnheader">Answer</div>
+                <div role="columnheader">Remarks</div>
+                <div role="columnheader">Photo</div>
+                <div role="columnheader">Status</div>
+              </div>
+              <?php foreach($mobile_items as $mobile_item):
+                  $mobile_question=$mobile_item[0];
+                  $mobile_a=$mobile_item[1];
+                  $mobile_value=$mobile_a?strtolower(trim((string)$mobile_a->answer_text)):'';
+                  $mobile_is_unanswered=$mobile_value==='';
+                  $mobile_is_fail=$mobile_a && ($mobile_value==='no'||strtolower((string)$mobile_a->result_status)==='fail');
+                  $mobile_photo_ids=$mobile_a?$this->normalize_attachment_ids($mobile_a->attachment_ids):[];
+              ?>
+              <div class="hrim-mobile-checkpoint-grid-row <?php echo $mobile_is_unanswered?'is-na':($mobile_is_fail?'is-fail':'is-pass'); ?>" role="row">
+                <div class="hrim-checkpoint-text-cell" role="cell"><?php echo esc_html($mobile_question->question?:'Checkpoint'); ?></div>
+                <div class="hrim-checkpoint-answer-cell" role="cell"><?php echo esc_html($mobile_is_unanswered?'No':ucfirst($mobile_a->answer_text)); ?></div>
+                <div class="hrim-checkpoint-remarks-cell" role="cell"><?php echo ($mobile_a && trim((string)$mobile_a->remarks)!=='')?nl2br(esc_html($mobile_a->remarks)):'—'; ?></div>
+                <div class="hrim-checkpoint-photo-cell" role="cell"><?php if($mobile_photo_ids): ?><div class="hrim-draft-photo-list"><?php foreach($mobile_photo_ids as $mobile_photo_id): $mobile_url=wp_get_attachment_image_url($mobile_photo_id,'thumbnail'); if($mobile_url): ?><a href="<?php echo esc_url(wp_get_attachment_url($mobile_photo_id)); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($mobile_url); ?>" alt="Checkpoint photo" loading="lazy" decoding="async"></a><?php endif; endforeach; ?></div><?php else: ?>—<?php endif; ?></div>
+                <div class="hrim-checkpoint-status-cell" role="cell"><span class="hrim-answer-icon"><span class="dashicons <?php echo $mobile_is_unanswered?'dashicons-minus':($mobile_is_fail?'dashicons-no-alt':'dashicons-yes-alt'); ?>"></span></span></div>
+              </div>
+              <?php endforeach; ?>
+            </div>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </section>
+        </div></td></tr>
         <?php return ob_get_clean();
     }
 
@@ -1167,7 +1646,7 @@ class HRIM_Core {
                 $wpdb->insert($sessions,['hotel_id'=>$hotel_id,'check_date'=>$today,'created_by'=>get_current_user_id(),'created_at'=>$now,'updated_at'=>$now]);
                 $session_id=(int)$wpdb->insert_id;
             }
-            $rooms=$wpdb->get_results($wpdb->prepare("SELECT id,floor_id FROM {$wpdb->prefix}hrim_rooms WHERE hotel_id=%d AND status='active' ORDER BY floor_id,room_no",$hotel_id));
+            $rooms=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.floor_id FROM {$wpdb->prefix}hrim_rooms r INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' AND LOWER(TRIM(at.name))='room' ORDER BY r.floor_id,r.room_no",$hotel_id));
             foreach($rooms as $room){
                 $wpdb->query($wpdb->prepare(
                     "INSERT IGNORE INTO {$entries} (occupancy_check_id,floor_id,room_id,created_at) VALUES (%d,%d,%d,%s)",
@@ -1181,11 +1660,13 @@ class HRIM_Core {
                 "SELECT DISTINCT f.id,f.name,f.sort_order
                  FROM {$entries} e
                  INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
-                 WHERE e.occupancy_check_id=%d
+                 INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
+                 INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                 WHERE e.occupancy_check_id=%d AND LOWER(TRIM(at.name))='room'
                  ORDER BY CASE WHEN COALESCE(f.sort_order,0)>0 THEN f.sort_order ELSE CAST(f.name AS UNSIGNED) END ASC, f.name ASC",
                 $session_id
             ));
-            $all_rows=$wpdb->get_results($wpdb->prepare("SELECT e.*,r.room_no FROM {$entries} e INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id WHERE e.occupancy_check_id=%d ORDER BY e.floor_id,CAST(r.room_no AS UNSIGNED),r.room_no",$session_id));
+            $all_rows=$wpdb->get_results($wpdb->prepare("SELECT e.*,r.room_no FROM {$entries} e INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE e.occupancy_check_id=%d AND LOWER(TRIM(at.name))='room' ORDER BY e.floor_id,CAST(r.room_no AS UNSIGNED),r.room_no",$session_id));
             foreach($all_rows as $row){
                 $fid=(int)$row->floor_id;
                 if(!isset($rows_by_floor[$fid])) $rows_by_floor[$fid]=[];
@@ -1195,7 +1676,7 @@ class HRIM_Core {
         ob_start(); ?>
         <div class="hrim-panel hrim-add-occupancy-panel">
           <div class="hrim-occupancy-topline">
-            <strong class="hrim-occupancy-date"><?php echo esc_html($this->ist_date('d/m/y',$today)); ?></strong>
+            <strong class="hrim-occupancy-date"><?php echo esc_html($this->ist_date('j M, Y',$today)); ?></strong>
             <?php echo $this->excel_button('occupancy-'.$today); ?>
           </div>
           <?php if(count($hotels)>1 && !$hotel_id): ?>
@@ -1220,10 +1701,17 @@ class HRIM_Core {
                 <div class="hrim-occ-modal-body">
                 <?php foreach($floors as $floor): $floor_rows=$rows_by_floor[(int)$floor->id]??[]; ?>
                   <div class="hrim-occ-floor-room-panel" data-floor-panel="<?php echo esc_attr($floor->id); ?>" hidden>
-                    <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-occupancy-room-table"><thead><tr><th>Room No.</th><th>Status</th></tr></thead><tbody>
-                    <?php if(!$floor_rows): ?><tr><td colspan="2" class="hrim-empty">No rooms found on this floor.</td></tr><?php endif; ?>
-                    <?php foreach($floor_rows as $row): $updated_ts=$row->updated_at?(new DateTime($row->updated_at,$this->ist_timezone()))->getTimestamp():0; $editable=!$row->status||!$updated_ts||(time()-$updated_ts)<=300; ?>
-                      <tr data-entry-id="<?php echo esc_attr($row->id); ?>"><td><?php echo esc_html($row->room_no); ?></td><td><div class="hrim-occ-status-buttons<?php echo $editable?'':' is-locked'; ?>" role="group" aria-label="Occupancy status"><button type="button" class="hrim-occ-status-btn yes<?php echo $row->status==='yes'?' is-selected':''; ?>" data-status="yes" <?php echo $editable?'':'disabled'; ?>>Yes</button><button type="button" class="hrim-occ-status-btn no<?php echo $row->status==='no'?' is-selected':''; ?>" data-status="no" <?php echo $editable?'':'disabled'; ?>>No</button><?php if(!$editable): ?><span class="hrim-occ-lock-icon" title="Locked" aria-label="Locked"><span class="dashicons dashicons-lock"></span></span><?php endif; ?></div></td></tr>
+                    <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-occupancy-room-table"><thead><tr><th>Room No.</th><th>Status</th><th class="hrim-occ-timestamp-col">Timestamp</th></tr></thead><tbody>
+                    <?php if(!$floor_rows): ?><tr><td colspan="3" class="hrim-empty">No rooms found on this floor.</td></tr><?php endif; ?>
+                    <?php foreach($floor_rows as $row):
+                      $updated_ts=$row->updated_at?(new DateTime($row->updated_at,$this->ist_timezone()))->getTimestamp():0;
+                      $raw_occ_status=strtolower(trim((string)$row->status));
+                      $occ_status=in_array($raw_occ_status,['yes','y','1','true','occupied'],true)?'yes':(in_array($raw_occ_status,['no','n','0','false','vacant'],true)?'no':'');
+                      $editable=!$occ_status||!$updated_ts||(time()-$updated_ts)<=300;
+                      $yes_style=$occ_status==='yes'?'background:#16a34a !important;background-color:#16a34a !important;color:#fff !important;border:2px solid #15803d !important;opacity:1 !important;':'background:#fff !important;background-color:#fff !important;color:#16a34a !important;border:2px solid #16a34a !important;opacity:1 !important;';
+                      $no_style=$occ_status==='no'?'background:#dc2626 !important;background-color:#dc2626 !important;color:#fff !important;border:2px solid #b91c1c !important;opacity:1 !important;':'background:#fff !important;background-color:#fff !important;color:#dc2626 !important;border:2px solid #dc2626 !important;opacity:1 !important;';
+                    ?>
+                      <tr data-entry-id="<?php echo esc_attr($row->id); ?>"><td><?php echo esc_html($row->room_no); ?></td><td><div class="hrim-occ-status-buttons<?php echo $editable?'':' is-locked'; ?>" data-current-status="<?php echo esc_attr($occ_status); ?>" role="group" aria-label="Occupancy status"><button type="button" class="hrim-occ-status-btn yes<?php echo $occ_status==='yes'?' is-selected':''; ?>" data-status="yes" style="<?php echo esc_attr($yes_style); ?>" <?php echo $editable?'':'disabled'; ?>>Yes</button><button type="button" class="hrim-occ-status-btn no<?php echo $occ_status==='no'?' is-selected':''; ?>" data-status="no" style="<?php echo esc_attr($no_style); ?>" <?php echo $editable?'':'disabled'; ?>>No</button><?php if(!$editable): ?><span class="hrim-occ-lock-icon" title="Locked" aria-label="Locked"><span class="dashicons dashicons-lock"></span></span><?php endif; ?></div></td><td class="hrim-occ-timestamp-col hrim-occ-time"><?php echo !empty($row->updated_at)?esc_html($this->ist_date('d/m/y h:i A',$row->updated_at)):'—'; ?></td></tr>
                     <?php endforeach; ?></tbody></table></div>
                   </div>
                 <?php endforeach; ?>
@@ -1233,7 +1721,7 @@ class HRIM_Core {
             </div>
           <?php else: ?><div class="hrim-empty">No active property is available.</div><?php endif; ?>
         </div>
-        <?php return $this->shell('Add Occupancy',ob_get_clean(),'add_occupancy');
+        <?php return $this->shell('Security Occupancy Count',ob_get_clean(),'add_occupancy');
     }
 
 
@@ -1241,14 +1729,16 @@ class HRIM_Core {
         if(!$this->can_inspect()) return $this->denied();
         global $wpdb;
         $sessions=$wpdb->prefix.'hrim_occupancy_checks';
+        $entries=$wpdb->prefix.'hrim_occupancy_check_rooms';
+        $floor_counts=$wpdb->prefix.'hrim_occupancy_floor_system_counts';
         $hotels=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_hotels WHERE status='active' ORDER BY name");
         $hotel_id=$this->effective_property_id(absint($_GET['hotel_id']??0));
         $today=substr($this->ist_now_mysql(),0,10);
 
         if($hotel_id){
             $today_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$sessions} WHERE hotel_id=%d AND check_date=%s ORDER BY id DESC LIMIT 1",$hotel_id,$today));
+            $now=$this->ist_now_mysql();
             if(!$today_id){
-                $now=$this->ist_now_mysql();
                 $wpdb->insert($sessions,[
                     'hotel_id'=>$hotel_id,
                     'check_date'=>$today,
@@ -1256,6 +1746,15 @@ class HRIM_Core {
                     'created_at'=>$now,
                     'updated_at'=>$now,
                 ]);
+                $today_id=(int)$wpdb->insert_id;
+            }
+            // Keep the same floor/room snapshot used by Security Occupancy Count.
+            $rooms=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.floor_id FROM {$wpdb->prefix}hrim_rooms r INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' AND LOWER(TRIM(at.name))='room' ORDER BY r.floor_id,r.room_no",$hotel_id));
+            foreach($rooms as $room){
+                $wpdb->query($wpdb->prepare(
+                    "INSERT IGNORE INTO {$entries} (occupancy_check_id,floor_id,room_id,created_at) VALUES (%d,%d,%d,%s)",
+                    $today_id,$room->floor_id,$room->id,$now
+                ));
             }
         }
 
@@ -1268,29 +1767,90 @@ class HRIM_Core {
         }
 
         ob_start(); ?>
-        <div class="hrim-panel hrim-update-office-count-panel">
+        <div class="hrim-panel hrim-update-office-count-panel hrim-record-card-panel hrim-force-mobile-table-view hrim-three-column-mobile-table">
+          <?php if($hotel_id): ?>
+            <div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('update-office-count'); ?></div></div>
+          <?php endif; ?>
           <?php if(count($hotels)>1 && !$hotel_id): ?>
             <form method="get" action="<?php echo esc_url($this->page_url('hotel-inspection-update-office-count')); ?>" class="hrim-filter">
               <label>Property *<select name="hotel_id" required onchange="this.form.submit()"><option value="">Select Property</option><?php foreach($hotels as $hotel): ?><option value="<?php echo esc_attr($hotel->id); ?>"><?php echo esc_html($hotel->name); ?></option><?php endforeach; ?></select></label>
             </form>
           <?php elseif($hotel_id): ?>
-            <div class="hrim-table-wrap"><table class="hrim-table hrim-office-count-table">
-              <thead><tr><th>Date</th><th>Office Count</th><th>Action</th></tr></thead>
+            <div class="hrim-table-wrap hrim-record-desktop-table"><table class="hrim-table hrim-office-count-table hrim-exportable">
+              <colgroup><col class="hrim-office-date-col"><col class="hrim-office-count-col"><col class="hrim-office-action-col"></colgroup>
+              <thead><tr><th>Date</th><th>System Count</th><th>Action</th></tr></thead>
               <tbody>
               <?php if(!$rows): ?><tr><td colspan="3">No occupancy records found.</td></tr><?php endif; ?>
               <?php foreach($rows as $row):
                 $saved=!($row->system_count===null || $row->system_count==='');
-                $updated_ts=($saved && !empty($row->updated_at)) ? (new DateTime($row->updated_at,$this->ist_timezone()))->getTimestamp() : 0;
-                $editable=!$saved || !$updated_ts || (time()-$updated_ts)<=300;
-                $icon=$saved?'dashicons-edit':'dashicons-yes';
-                $title=$saved?'Edit Office Count':'Add Office Count';
+                $floor_rows=$wpdb->get_results($wpdb->prepare(
+                    "SELECT DISTINCT f.id,f.name,f.sort_order,fc.system_count,fc.updated_at
+                     FROM {$entries} e
+                     INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
+                     INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
+                     INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                     LEFT JOIN {$floor_counts} fc ON fc.occupancy_check_id=e.occupancy_check_id AND fc.floor_id=f.id
+                     WHERE e.occupancy_check_id=%d AND LOWER(TRIM(at.name))='room'
+                     ORDER BY CASE WHEN COALESCE(f.sort_order,0)>0 THEN f.sort_order ELSE CAST(f.name AS UNSIGNED) END ASC,f.name ASC",
+                    $row->id
+                ));
+                if(!$floor_rows){
+                    $floor_rows=$wpdb->get_results($wpdb->prepare(
+                        "SELECT DISTINCT f.id,f.name,f.sort_order,NULL system_count,NULL updated_at
+                         FROM {$wpdb->prefix}hrim_floors f
+                         INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.floor_id=f.id
+                         INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                         WHERE f.hotel_id=%d AND f.status='active' AND r.status='active' AND LOWER(TRIM(at.name))='room'
+                         ORDER BY CASE WHEN COALESCE(f.sort_order,0)>0 THEN f.sort_order ELSE CAST(f.name AS UNSIGNED) END ASC,f.name ASC",
+                        $hotel_id
+                    ));
+                }
+                $floor_payload=[];
+                $any_editable=false;
+                $has_floor_values=false;
+                $floor_saved_sum=0;
+                foreach($floor_rows as $fr){
+                    $fr_saved=!($fr->system_count===null || $fr->system_count==='');
+                    $fr_locked=false;
+                    if($fr_saved && !empty($fr->updated_at)){
+                        $fr_ts=(new DateTime($fr->updated_at,$this->ist_timezone()))->getTimestamp();
+                        $fr_locked=(time()-$fr_ts)>300;
+                    }
+                    if(!$fr_saved || !$fr_locked) $any_editable=true;
+                    if($fr_saved){
+                        $has_floor_values=true;
+                        $floor_saved_sum += (int)$fr->system_count;
+                    }
+                    $floor_payload[]=[
+                        'id'=>(int)$fr->id,
+                        'name'=>(string)$fr->name,
+                        'count'=>$fr_saved?(int)$fr->system_count:null,
+                        'locked'=>$fr_locked,
+                        'editable_until'=>($fr_saved && !empty($fr->updated_at)) ? ((new DateTime($fr->updated_at,$this->ist_timezone()))->getTimestamp()+300) : null,
+                        'updated_at'=>($fr_saved && !empty($fr->updated_at)) ? $this->ist_date('d/m/y h:i A',$fr->updated_at) : '',
+                    ];
+                }
+                // Once every Security floor has a System Count, lock the main Action immediately.
+                // Individual fields keep their existing five-minute state only while this modal is already open.
+                $all_floors_completed = !empty($floor_rows);
+                foreach($floor_rows as $__fr_check){
+                    if($__fr_check->system_count===null || $__fr_check->system_count===''){ $all_floors_completed=false; break; }
+                }
+                if($all_floors_completed) $any_editable=false;
+
+                // Legacy total-only records remain protected by their original 5-minute window.
+                if($saved && !$has_floor_values && !empty($row->updated_at)){
+                    $legacy_ts=(new DateTime($row->updated_at,$this->ist_timezone()))->getTimestamp();
+                    if((time()-$legacy_ts)>300) $any_editable=false;
+                }
+                $title=$saved?'Edit Floor-wise System Count':'Add Floor-wise System Count';
               ?>
-                <tr>
-                  <td><?php echo esc_html($this->ist_date('d/m/y',$row->check_date)); ?></td>
-                  <td><?php echo $saved?esc_html((int)$row->system_count):'—'; ?></td>
-                  <td>
-                    <?php if($editable): ?>
-                      <button type="button" class="hrim-action <?php echo $saved?'edit':'verify'; ?> hrim-open-office-count-modal" data-session-id="<?php echo esc_attr($row->id); ?>" data-date="<?php echo esc_attr($this->ist_date('d/m/y',$row->check_date)); ?>" data-count="<?php echo $saved?esc_attr((int)$row->system_count):''; ?>" title="<?php echo esc_attr($title); ?>"><span class="dashicons <?php echo esc_attr($icon); ?>"></span></button>
+                <tr data-session-id="<?php echo esc_attr($row->id); ?>">
+                  <td class="hrim-mobile-card-title" data-label="Date"><?php echo esc_html($this->ist_date('d/m/y',$row->check_date)); ?></td>
+                  <td data-label="System Count"><?php echo $has_floor_values?esc_html($floor_saved_sum):($saved?esc_html((int)$row->system_count):'—'); ?></td>
+                  <td data-label="Action">
+                    <?php if($floor_payload): ?>
+                      <button type="button" class="hrim-action edit hrim-open-office-count-modal hrim-office-count-edit-btn<?php echo $any_editable?'':' is-locked'; ?>" data-session-id="<?php echo esc_attr($row->id); ?>" data-date="<?php echo esc_attr($this->ist_date('d/m/y',$row->check_date)); ?>" data-floors="<?php echo esc_attr(wp_json_encode($floor_payload)); ?>" data-locked="<?php echo $any_editable?'0':'1'; ?>" title="<?php echo esc_attr($any_editable?$title:'Locked'); ?>" aria-label="<?php echo esc_attr($any_editable?$title:'Locked'); ?>"><span class="dashicons dashicons-edit"></span><?php if(!$any_editable): ?><span class="hrim-office-count-lock-badge" aria-hidden="true"><span class="dashicons dashicons-lock"></span></span><?php endif; ?></button>
                     <?php else: ?>
                       <span class="hrim-action hrim-office-count-locked" title="Locked"><span class="dashicons dashicons-lock"></span></span>
                     <?php endif; ?>
@@ -1305,21 +1865,14 @@ class HRIM_Core {
         </div>
 
         <div class="hrim-modal" id="hrimOfficeCountModal" aria-hidden="true">
-          <div class="hrim-modal-card">
+          <div class="hrim-modal-card hrim-modal-wide">
             <button type="button" class="hrim-modal-close" aria-label="Close">&times;</button>
-            <h2>Update Office Count</h2>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="hrim-form">
-              <?php wp_nonce_field('hrim_save_occupancy_office_count'); ?>
-              <input type="hidden" name="action" value="hrim_save_occupancy_office_count">
-              <input type="hidden" name="session_id" id="hrimOfficeSessionId" value="">
-              <input type="hidden" name="hotel_id" value="<?php echo esc_attr($hotel_id); ?>">
-              <label>Date *<input type="text" id="hrimOfficeDate" value="" readonly></label>
-              <label>Office Count *<input type="number" name="system_count" id="hrimOfficeCount" min="0" step="1" required></label>
-              <div class="hrim-form-actions"><button type="submit" class="hrim-primary">Update</button></div>
-            </form>
+            <h2>System Occupancy Count</h2>
+            <div class="hrim-office-floor-date"><strong id="hrimOfficeDateText"></strong></div>
+            <div class="hrim-occ-floor-button-list" id="hrimOfficeFloorButtons"></div>
           </div>
         </div>
-        <?php return $this->shell('Update Office Count',ob_get_clean(),'update_office_count');
+        <?php return $this->shell('System Occupancy Count',ob_get_clean(),'update_office_count');
     }
 
     public function save_occupancy_office_count(){
@@ -1327,28 +1880,69 @@ class HRIM_Core {
         check_admin_referer('hrim_save_occupancy_office_count');
         global $wpdb;
         $session_id=absint($_POST['session_id']??0);
+        $floor_id=absint($_POST['floor_id']??0);
         $hotel_id=$this->effective_property_id(absint($_POST['hotel_id']??0));
         $count_raw=isset($_POST['system_count'])?trim((string)wp_unslash($_POST['system_count'])):'';
         if($count_raw==='' || !is_numeric($count_raw) || intval($count_raw)<0){
-            wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'Office Count is required.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
+            wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'System Count is required.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
         }
         $session=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_occupancy_checks WHERE id=%d AND hotel_id=%d",$session_id,$hotel_id));
         if(!$session){
             wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'Occupancy record was not found.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
         }
-        $office_count_saved = !($session->system_count===null || $session->system_count==='');
-        if($office_count_saved && !empty($session->updated_at)){
-            $office_updated_ts=(new DateTime($session->updated_at,$this->ist_timezone()))->getTimestamp();
-            if((time()-$office_updated_ts)>300){
-                wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'The 5-minute Office Count edit window has expired.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
+        $floor_valid=(int)$wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}hrim_occupancy_check_rooms WHERE occupancy_check_id=%d AND floor_id=%d",
+            $session_id,$floor_id
+        ));
+        if(!$floor_valid){
+            $floor_valid=(int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}hrim_floors f INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.floor_id=f.id INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE f.id=%d AND f.hotel_id=%d AND f.status='active' AND r.status='active' AND LOWER(TRIM(at.name))='room'",
+                $floor_id,$hotel_id
+            ));
+        }
+        if(!$floor_valid){
+            wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'Floor was not found for this occupancy record.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
+        }
+
+        $table=$wpdb->prefix.'hrim_occupancy_floor_system_counts';
+        $existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE occupancy_check_id=%d AND floor_id=%d",$session_id,$floor_id));
+        if($existing && !empty($existing->updated_at)){
+            $updated_ts=(new DateTime($existing->updated_at,$this->ist_timezone()))->getTimestamp();
+            if((time()-$updated_ts)>300){
+                wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_error'=>'The 5-minute System Count edit window has expired for this floor.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
             }
         }
-        $wpdb->update($wpdb->prefix.'hrim_occupancy_checks',[
+        $now=$this->ist_now_mysql();
+        $uid=get_current_user_id();
+        $data=[
             'system_count'=>max(0,intval($count_raw)),
-            'system_updated_by'=>get_current_user_id(),
-            'updated_at'=>$this->ist_now_mysql(),
+            'updated_by'=>$uid,
+            'updated_at'=>$now,
+        ];
+        if($existing){
+            $wpdb->update($table,$data,['id'=>$existing->id]);
+        } else {
+            $data['occupancy_check_id']=$session_id;
+            $data['floor_id']=$floor_id;
+            $data['created_at']=$now;
+            $wpdb->insert($table,$data);
+        }
+
+        $expected_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT floor_id) FROM {$wpdb->prefix}hrim_occupancy_check_rooms WHERE occupancy_check_id=%d",$session_id));
+        if(!$expected_floors){
+            $expected_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT r.floor_id) FROM {$wpdb->prefix}hrim_rooms r INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' AND LOWER(TRIM(at.name))='room'",$hotel_id));
+        }
+        $saved_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE occupancy_check_id=%d",$session_id));
+        $sum=(int)$wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(system_count),0) FROM {$table} WHERE occupancy_check_id=%d",$session_id));
+        $total=$saved_floors>0?$sum:null;
+        $complete=($expected_floors>0 && $saved_floors>=$expected_floors);
+        $wpdb->update($wpdb->prefix.'hrim_occupancy_checks',[
+            'system_count'=>$total,
+            'system_updated_by'=>$uid,
+            'updated_at'=>$now,
         ],['id'=>$session_id]);
-        wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_saved'=>1,'hrim_message'=>'Office Count updated successfully.'],$this->page_url('hotel-inspection-update-office-count'))); exit;
+        $message=$total===null?'Floor System Count updated. Complete the remaining floors to get the total.':'Floor System Count updated successfully.';
+        wp_safe_redirect(add_query_arg(['hotel_id'=>$hotel_id,'hrim_saved'=>1,'hrim_message'=>$message],$this->page_url('hotel-inspection-update-office-count'))); exit;
     }
 
     public function occupancy_check_shortcode(){
@@ -1361,13 +1955,15 @@ class HRIM_Core {
         ob_start();
         if($session_id){
             $session=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$sessions} WHERE id=%d",$session_id));
-            if(!$session) return $this->shell('Occupancy Check','<div class="hrim-alert error">Occupancy check not found.</div>','occupancy');
+            if(!$session) return $this->shell('System Vs Security','<div class="hrim-alert error">Occupancy check not found.</div>','occupancy');
 
             $floors=$wpdb->get_results($wpdb->prepare(
                 "SELECT DISTINCT f.id,f.name,f.sort_order
                  FROM {$entries} e
                  INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
-                 WHERE e.occupancy_check_id=%d
+                 INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
+                 INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                 WHERE e.occupancy_check_id=%d AND LOWER(TRIM(at.name))='room'
                  ORDER BY f.sort_order,f.name",
                 $session_id
             ));
@@ -1376,7 +1972,8 @@ class HRIM_Core {
                  FROM {$entries} e
                  INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
                  INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
-                 WHERE e.occupancy_check_id=%d
+                 INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                 WHERE e.occupancy_check_id=%d AND LOWER(TRIM(at.name))='room'
                  ORDER BY f.sort_order,f.name,r.room_no",
                 $session_id
             ));
@@ -1404,9 +2001,10 @@ class HRIM_Core {
                     <?php foreach($floors as $floor): $floor_rows=$rows_by_floor[(int)$floor->id]??[]; ?>
                       <div class="hrim-occ-floor-room-panel" data-floor-panel="<?php echo esc_attr($floor->id); ?>" hidden>
                         <div class="hrim-table-wrap"><table class="hrim-table hrim-occupancy-room-table"><thead><tr><th>Room No.</th><th>Status</th></tr></thead><tbody>
-                        <?php if(!$floor_rows): ?><tr><td colspan="2" class="hrim-empty">No rooms found on this floor.</td></tr><?php endif; ?>
+                        <?php if(!$floor_rows): ?><tr><td colspan="3" class="hrim-empty">No rooms found on this floor.</td></tr><?php endif; ?>
                         <?php foreach($floor_rows as $row): ?>
-                          <tr><td><?php echo esc_html($row->room_no); ?></td><td><div class="hrim-occ-status-buttons is-locked"><button type="button" class="hrim-occ-status-btn yes<?php echo $row->status==='yes'?' is-selected':''; ?>" disabled>Yes</button><button type="button" class="hrim-occ-status-btn no<?php echo $row->status==='no'?' is-selected':''; ?>" disabled>No</button><span class="hrim-occ-lock-icon" title="Locked" aria-label="Locked"><span class="dashicons dashicons-lock"></span></span></div></td></tr>
+                          <?php $raw_occ_status=strtolower(trim((string)$row->status)); $occ_status=in_array($raw_occ_status,['yes','y','1','true','occupied'],true)?'yes':(in_array($raw_occ_status,['no','n','0','false','vacant'],true)?'no':''); ?>
+                          <tr><td><?php echo esc_html($row->room_no); ?></td><td><div class="hrim-occ-status-buttons is-locked" data-current-status="<?php echo esc_attr($occ_status); ?>"><button type="button" class="hrim-occ-status-btn yes<?php echo $occ_status==='yes'?' is-selected':''; ?>" style="<?php echo esc_attr($occ_status==='yes'?'background:#16a34a !important;background-color:#16a34a !important;color:#fff !important;border:2px solid #15803d !important;opacity:1 !important;':'background:#fff !important;background-color:#fff !important;color:#16a34a !important;border:2px solid #16a34a !important;opacity:1 !important;'); ?>" disabled>Yes</button><button type="button" class="hrim-occ-status-btn no<?php echo $occ_status==='no'?' is-selected':''; ?>" style="<?php echo esc_attr($occ_status==='no'?'background:#dc2626 !important;background-color:#dc2626 !important;color:#fff !important;border:2px solid #b91c1c !important;opacity:1 !important;':'background:#fff !important;background-color:#fff !important;color:#dc2626 !important;border:2px solid #dc2626 !important;opacity:1 !important;'); ?>" disabled>No</button><span class="hrim-occ-lock-icon" title="Locked" aria-label="Locked"><span class="dashicons dashicons-lock"></span></span></div></td></tr>
                         <?php endforeach; ?></tbody></table></div>
                       </div>
                     <?php endforeach; ?>
@@ -1416,18 +2014,109 @@ class HRIM_Core {
             </div>
             <?php
         } else {
-            $rows=$wpdb->get_results("SELECT c.*,h.name hotel_name,u.display_name system_user_name,(SELECT COUNT(*) FROM {$entries} e WHERE e.occupancy_check_id=c.id AND e.status='yes') yes_count,(SELECT COUNT(*) FROM {$entries} e WHERE e.occupancy_check_id=c.id) total_count FROM {$sessions} c LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=c.hotel_id LEFT JOIN {$wpdb->users} u ON u.ID=c.system_updated_by ORDER BY c.check_date DESC,c.id DESC");
+            $rows=$wpdb->get_results("SELECT c.*,h.name hotel_name,u.display_name system_user_name,(SELECT COUNT(*) FROM {$entries} e INNER JOIN {$wpdb->prefix}hrim_rooms r1 ON r1.id=e.room_id INNER JOIN {$wpdb->prefix}hrim_asset_types at1 ON at1.id=r1.asset_type_id WHERE e.occupancy_check_id=c.id AND e.status='yes' AND LOWER(TRIM(at1.name))='room') yes_count,(SELECT COUNT(*) FROM {$entries} e INNER JOIN {$wpdb->prefix}hrim_rooms r2 ON r2.id=e.room_id INNER JOIN {$wpdb->prefix}hrim_asset_types at2 ON at2.id=r2.asset_type_id WHERE e.occupancy_check_id=c.id AND LOWER(TRIM(at2.name))='room') total_count FROM {$sessions} c LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=c.hotel_id LEFT JOIN {$wpdb->users} u ON u.ID=c.system_updated_by ORDER BY c.check_date DESC,c.id DESC");
+
+            // v3.19.23: floor-wise Security vs System detail shown below the clicked summary row.
+            $floor_detail_rows=$wpdb->get_results("SELECT e.occupancy_check_id,f.id floor_id,f.name floor_name,f.sort_order,
+                SUM(CASE WHEN LOWER(TRIM(COALESCE(e.status,''))) IN ('yes','y','1','true','occupied') THEN 1 ELSE 0 END) security_count,
+                fc.system_count
+                FROM {$entries} e
+                INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
+                INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
+                LEFT JOIN {$wpdb->prefix}hrim_occupancy_floor_system_counts fc ON fc.occupancy_check_id=e.occupancy_check_id AND fc.floor_id=e.floor_id
+                WHERE LOWER(TRIM(at.name))='room'
+                GROUP BY e.occupancy_check_id,f.id,f.name,f.sort_order,fc.system_count
+                ORDER BY e.occupancy_check_id DESC,f.sort_order,f.name");
+            $floor_details_by_session=[];
+            $floor_system_totals_by_session=[];
+            $floor_system_has_value_by_session=[];
+            foreach($floor_detail_rows as $fd){
+                $sid=(int)$fd->occupancy_check_id;
+                $floor_details_by_session[$sid][]=$fd;
+                if($fd->system_count!==null && $fd->system_count!==''){
+                    if(!isset($floor_system_totals_by_session[$sid])) $floor_system_totals_by_session[$sid]=0;
+                    $floor_system_totals_by_session[$sid]+=(int)$fd->system_count;
+                    $floor_system_has_value_by_session[$sid]=true;
+                }
+            }
+
+            // v3.19.28: System Vs Security must show the same System Count as the
+            // System Occupancy Count view. Floor-wise saved values are the source of
+            // truth; fall back to the legacy session total only when no floor value exists.
+
+            // v3.19.25: per-floor Security "Yes" asset detail (asset/room name + update timestamp + updated by).
+            $security_yes_rows=$wpdb->get_results("SELECT e.occupancy_check_id,e.floor_id,r.room_no asset_name,e.updated_at,u.display_name updated_by_name
+                FROM {$entries} e
+                INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.id=e.room_id
+                INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id
+                INNER JOIN {$wpdb->prefix}hrim_floors f ON f.id=e.floor_id
+                LEFT JOIN {$wpdb->users} u ON u.ID=e.updated_by
+                WHERE LOWER(TRIM(at.name))='room'
+                  AND LOWER(TRIM(COALESCE(e.status,''))) IN ('yes','y','1','true','occupied')
+                ORDER BY e.occupancy_check_id DESC,f.sort_order,f.name,r.room_no");
+            $security_yes_by_session_floor=[];
+            foreach($security_yes_rows as $sy){
+                $security_yes_by_session_floor[(int)$sy->occupancy_check_id][(int)$sy->floor_id][]=$sy;
+            }
             ?>
-            <div class="hrim-panel">
-              <div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Date</th><th>Security Count</th><th>Office Count</th><th>Office Updated By</th><th>Office Update Status</th><th>Actions</th></tr></thead><tbody>
-              <?php if(!$rows): ?><tr><td colspan="7">No occupancy checks found.</td></tr><?php endif; ?>
-              <?php foreach($rows as $i=>$row): $sys_status=$row->system_count===null||$row->system_count===''?'Pending':(((int)$row->system_count===(int)$row->yes_count)?'Matched':'Mismatch'); $is_old=((string)$row->check_date < substr($this->ist_now_mysql(),0,10)); ?>
-                <tr data-session-id="<?php echo esc_attr($row->id); ?>"><td><?php echo esc_html($i+1); ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$row->check_date)); ?></td><td class="hrim-occ-yes-count"><?php echo esc_html((int)$row->yes_count); ?></td><td class="hrim-occ-system-count-value"><?php echo ($row->system_count===null || $row->system_count==='')?'—':esc_html((int)$row->system_count); ?></td><td class="hrim-occ-system-user-name"><?php echo $row->system_user_name ? esc_html($row->system_user_name) : '—'; ?></td><td class="hrim-occ-system-status"><span class="hrim-status <?php echo strtolower($sys_status); ?>"><?php echo esc_html($sys_status); ?></span></td><td><a class="hrim-action view" href="<?php echo esc_url(add_query_arg('check_id',$row->id,$this->page_url('hotel-inspection-occupancy-check'))); ?>" title="Open"><span class="dashicons dashicons-visibility"></span></a></td></tr>
+            <div class="hrim-panel hrim-record-card-panel hrim-occupancy-list-panel hrim-force-mobile-table-view hrim-occupancy-mobile-table-view">
+              <div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->excel_button('occupancy-check'); ?></div></div>
+              <div class="hrim-table-wrap hrim-record-desktop-table"><table class="hrim-table hrim-exportable hrim-occupancy-check-table"><thead><tr><th>Sl.</th><th>Date</th><th>Security</th><th>System</th><th>Office Updated By</th><th>Office Update Status</th><th class="hrim-no-export">Action</th></tr></thead><tbody>
+              <?php if(!$rows): ?><tr><td colspan="7">No System Vs Security records found.</td></tr><?php endif; ?>
+              <?php foreach($rows as $i=>$row): $sid=(int)$row->id; $has_floor_system=!empty($floor_system_has_value_by_session[$sid]); $effective_system_count=$has_floor_system?($floor_system_totals_by_session[$sid]??0):(($row->system_count===null||$row->system_count==='')?null:(int)$row->system_count); $sys_status=$effective_system_count===null?'Pending':(((int)$effective_system_count===(int)$row->yes_count)?'Matched':'Mismatch'); $is_old=((string)$row->check_date < substr($this->ist_now_mysql(),0,10)); $detail_id='hrimOccCompareDetail'.(int)$row->id; $floor_detail=$floor_details_by_session[(int)$row->id]??[]; ?>
+                <tr class="hrim-occupancy-compare-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($detail_id); ?>" data-session-id="<?php echo esc_attr($row->id); ?>"><td class="hrim-mobile-hide-sl" data-label="Sl."><?php echo esc_html($i+1); ?></td><td class="hrim-mobile-card-title" data-label="Date"><?php echo esc_html($this->ist_date('d/m/y',$row->check_date)); ?><span class="hrim-occupancy-detail-arrow" aria-hidden="true">&#9662;</span></td><td class="hrim-occ-yes-count" data-label="Security"><?php echo esc_html((int)$row->yes_count); ?></td><td class="hrim-occ-system-count-value" data-label="System Count"><?php echo $effective_system_count===null?'—':esc_html((int)$effective_system_count); ?></td><td class="hrim-occ-system-user-name" data-label="Office Updated By"><?php echo $row->system_user_name ? esc_html($row->system_user_name) : '—'; ?></td><td class="hrim-occ-system-status" data-label="Office Update Status"><span class="hrim-status <?php echo strtolower($sys_status); ?>"><?php echo esc_html($sys_status); ?></span></td><td class="hrim-no-export hrim-occupancy-delete-cell" data-label="Action"><div class="hrim-actions"><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this occupancy record completely from Security Occupancy Count, System Occupancy Count and System Vs Security? This action cannot be undone.');"><input type="hidden" name="action" value="hrim_delete_occupancy_check"><input type="hidden" name="id" value="<?php echo esc_attr($row->id); ?>"><?php wp_nonce_field('hrim_delete_occupancy_check'); ?><button type="submit" class="hrim-icon-btn hrim-action-delete hrim-delete" title="Delete Occupancy Record" aria-label="Delete Occupancy Record"><span class="dashicons dashicons-trash"></span></button></form></div></td></tr>
+                <tr id="<?php echo esc_attr($detail_id); ?>" class="hrim-occupancy-compare-detail-row" hidden><td colspan="7"><div class="hrim-occupancy-compare-detail"><div class="hrim-table-wrap"><table class="hrim-table hrim-occupancy-floor-compare-table"><thead><tr><th>Floor</th><th>Security</th><th>System</th></tr></thead><tbody><?php if(!$floor_detail): ?><tr><td colspan="3" class="hrim-empty">No floor-wise details found.</td></tr><?php else: foreach($floor_detail as $fd): $floor_asset_detail_id='hrimOccFloorAssetDetail'.(int)$row->id.'-'.(int)$fd->floor_id; $security_assets=$security_yes_by_session_floor[(int)$row->id][(int)$fd->floor_id]??[]; ?><tr class="hrim-occupancy-floor-compare-row" tabindex="0" role="button" aria-expanded="false" data-target="<?php echo esc_attr($floor_asset_detail_id); ?>"><td><?php echo esc_html($fd->floor_name); ?><span class="hrim-occupancy-floor-detail-arrow" aria-hidden="true">&#9662;</span></td><td><?php echo esc_html((int)$fd->security_count); ?></td><td><?php echo ($fd->system_count===null || $fd->system_count==='')?'—':esc_html((int)$fd->system_count); ?></td></tr><tr id="<?php echo esc_attr($floor_asset_detail_id); ?>" class="hrim-occupancy-floor-asset-detail-row" hidden><td colspan="3"><div class="hrim-occupancy-floor-asset-detail"><table class="hrim-table hrim-occupancy-security-assets-table"><thead><tr><th>Asset Name</th><th>Security Update</th><th>Timestamp</th><th>Update By</th></tr></thead><tbody><?php if(!$security_assets): ?><tr><td colspan="4" class="hrim-empty">No Security Yes assets found on this floor.</td></tr><?php else: foreach($security_assets as $asset): ?><tr><td><?php echo esc_html($asset->asset_name); ?></td><td><span class="hrim-security-yes-badge">Yes</span></td><td><?php echo !empty($asset->updated_at)?esc_html($this->ist_date('d/m/y h:i A',$asset->updated_at)):'—'; ?></td><td><?php echo !empty($asset->updated_by_name)?esc_html($asset->updated_by_name):'—'; ?></td></tr><?php endforeach; endif; ?></tbody></table></div></td></tr><?php endforeach; endif; ?></tbody><tfoot><tr><th>Total</th><th><?php echo esc_html((int)$row->yes_count); ?></th><th><?php echo $effective_system_count===null?'—':esc_html((int)$effective_system_count); ?></th></tr></tfoot></table></div></div></td></tr>
               <?php endforeach; ?></tbody></table></div>
+              <div class="hrim-record-mobile-list hrim-occupancy-mobile-list">
+                <?php if(!$rows): ?><div class="hrim-record-mobile-empty">No System Vs Security records found.</div><?php endif; ?>
+                <?php foreach($rows as $i=>$row): $sid=(int)$row->id; $has_floor_system=!empty($floor_system_has_value_by_session[$sid]); $effective_system_count=$has_floor_system?($floor_system_totals_by_session[$sid]??0):(($row->system_count===null||$row->system_count==='')?null:(int)$row->system_count); $sys_status=$effective_system_count===null?'Pending':(((int)$effective_system_count===(int)$row->yes_count)?'Matched':'Mismatch'); ?>
+                  <article class="hrim-record-mobile-card" data-session-id="<?php echo esc_attr($row->id); ?>">
+                    <header><span>Date</span><strong><?php echo esc_html($this->ist_date('d/m/y',$row->check_date)); ?></strong></header>
+                    <div class="hrim-record-mobile-row"><span>Security</span><strong><?php echo esc_html((int)$row->yes_count); ?></strong></div>
+                    <div class="hrim-record-mobile-row"><span>System</span><strong><?php echo $effective_system_count===null?'—':esc_html((int)$effective_system_count); ?></strong></div>
+                    <div class="hrim-record-mobile-row"><span>Office Updated By</span><strong><?php echo $row->system_user_name ? esc_html($row->system_user_name) : '—'; ?></strong></div>
+                    <div class="hrim-record-mobile-row"><span>Office Update Status</span><strong><span class="hrim-status <?php echo strtolower($sys_status); ?>"><?php echo esc_html($sys_status); ?></span></strong></div>
+                    <div class="hrim-record-mobile-row hrim-no-export"><span>Action</span><strong><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this occupancy record completely from Security Occupancy Count, System Occupancy Count and System Vs Security? This action cannot be undone.');"><input type="hidden" name="action" value="hrim_delete_occupancy_check"><input type="hidden" name="id" value="<?php echo esc_attr($row->id); ?>"><?php wp_nonce_field('hrim_delete_occupancy_check'); ?><button type="submit" class="hrim-icon-btn hrim-action-delete hrim-delete" title="Delete Occupancy Record" aria-label="Delete Occupancy Record"><span class="dashicons dashicons-trash"></span></button></form></strong></div>
+                  </article>
+                <?php endforeach; ?>
+              </div>
             </div>
             <?php
         }
-        return $this->shell('Occupancy Check',ob_get_clean(),'occupancy');
+        return $this->shell('System Vs Security',ob_get_clean(),'occupancy');
+    }
+
+    // v3.19.26: permanently delete one occupancy session and all linked Security/System data.
+    public function delete_occupancy_check(){
+        if(!$this->can_inspect()) wp_die('Access denied');
+        check_admin_referer('hrim_delete_occupancy_check');
+        global $wpdb;
+        $id=absint($_POST['id']??0);
+        if(!$id){
+            wp_safe_redirect(add_query_arg('hrim_error','Occupancy record was not found.',$this->page_url('hotel-inspection-occupancy-check')));
+            exit;
+        }
+        $sessions=$wpdb->prefix.'hrim_occupancy_checks';
+        $entries=$wpdb->prefix.'hrim_occupancy_check_rooms';
+        $floor_counts=$wpdb->prefix.'hrim_occupancy_floor_system_counts';
+        $exists=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$sessions} WHERE id=%d",$id));
+        if(!$exists){
+            wp_safe_redirect(add_query_arg('hrim_error','Occupancy record was not found.',$this->page_url('hotel-inspection-occupancy-check')));
+            exit;
+        }
+        $wpdb->query('START TRANSACTION');
+        $ok1=$wpdb->delete($entries,['occupancy_check_id'=>$id],['%d']);
+        $ok2=$wpdb->delete($floor_counts,['occupancy_check_id'=>$id],['%d']);
+        $ok3=$wpdb->delete($sessions,['id'=>$id],['%d']);
+        if($ok1===false || $ok2===false || $ok3===false){
+            $wpdb->query('ROLLBACK');
+            wp_safe_redirect(add_query_arg('hrim_error','Could not delete the occupancy record. Please try again.',$this->page_url('hotel-inspection-occupancy-check')));
+            exit;
+        }
+        $wpdb->query('COMMIT');
+        wp_safe_redirect(add_query_arg(['hrim_saved'=>1,'hrim_message'=>'Occupancy record deleted completely from Security Occupancy Count, System Occupancy Count and System Vs Security.'],$this->page_url('hotel-inspection-occupancy-check')));
+        exit;
     }
 
     public function create_occupancy_check(){
@@ -1448,7 +2137,7 @@ class HRIM_Core {
         }
         $wpdb->insert($wpdb->prefix.'hrim_occupancy_checks',['hotel_id'=>$hotel_id,'check_date'=>$check_date,'created_by'=>get_current_user_id(),'created_at'=>$now,'updated_at'=>$now]);
         $id=(int)$wpdb->insert_id;
-        $rooms=$wpdb->get_results($wpdb->prepare("SELECT id,floor_id FROM {$wpdb->prefix}hrim_rooms WHERE hotel_id=%d AND status='active' ORDER BY floor_id,room_no",$hotel_id));
+        $rooms=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.floor_id FROM {$wpdb->prefix}hrim_rooms r INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' AND LOWER(TRIM(at.name))='room' ORDER BY r.floor_id,r.room_no",$hotel_id));
         foreach($rooms as $room) $wpdb->insert($wpdb->prefix.'hrim_occupancy_check_rooms',['occupancy_check_id'=>$id,'floor_id'=>$room->floor_id,'room_id'=>$room->id,'created_at'=>$now]);
         wp_safe_redirect(add_query_arg('check_id',$id,$this->page_url('hotel-inspection-occupancy-check'))); exit;
     }
@@ -1472,17 +2161,84 @@ class HRIM_Core {
         wp_send_json_success(['time'=>$this->ist_date('d/m/y, h:i A',$now),'user'=>wp_get_current_user()->display_name,'yes_count'=>$yes,'editable_until'=>time()+300]);
     }
 
+    public function ajax_save_floor_system_count(){
+        check_ajax_referer('hrim_ajax','nonce');
+        if(!$this->can_inspect()) wp_send_json_error(['message'=>'Access denied.'],403);
+        global $wpdb;
+        $session_id=absint($_POST['session_id']??0);
+        $floor_id=absint($_POST['floor_id']??0);
+        $count_raw=isset($_POST['system_count'])?trim((string)wp_unslash($_POST['system_count'])):'';
+        if(!$session_id || !$floor_id || $count_raw==='' || !is_numeric($count_raw) || intval($count_raw)<0){
+            wp_send_json_error(['message'=>'Enter a valid System Count.'],400);
+        }
+        $session=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_occupancy_checks WHERE id=%d",$session_id));
+        if(!$session) wp_send_json_error(['message'=>'Occupancy record was not found.'],404);
+        $hotel_id=(int)$session->hotel_id;
+        $floor_valid=(int)$wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}hrim_occupancy_check_rooms WHERE occupancy_check_id=%d AND floor_id=%d",
+            $session_id,$floor_id
+        ));
+        if(!$floor_valid){
+            $floor_valid=(int)$wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}hrim_floors f INNER JOIN {$wpdb->prefix}hrim_rooms r ON r.floor_id=f.id INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE f.id=%d AND f.hotel_id=%d AND f.status='active' AND r.status='active' AND LOWER(TRIM(at.name))='room'",
+                $floor_id,$hotel_id
+            ));
+        }
+        if(!$floor_valid) wp_send_json_error(['message'=>'Floor was not found for this occupancy record.'],404);
+
+        $table=$wpdb->prefix.'hrim_occupancy_floor_system_counts';
+        $existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE occupancy_check_id=%d AND floor_id=%d",$session_id,$floor_id));
+        if($existing && !empty($existing->updated_at)){
+            $updated_ts=(new DateTime($existing->updated_at,$this->ist_timezone()))->getTimestamp();
+            if((time()-$updated_ts)>300) wp_send_json_error(['message'=>'The 5-minute edit window has expired.','locked'=>true],403);
+        }
+        $now=$this->ist_now_mysql();
+        $uid=get_current_user_id();
+        $data=['system_count'=>max(0,intval($count_raw)),'updated_by'=>$uid,'updated_at'=>$now];
+        if($existing){
+            $wpdb->update($table,$data,['id'=>$existing->id]);
+        } else {
+            $data['occupancy_check_id']=$session_id;
+            $data['floor_id']=$floor_id;
+            $data['created_at']=$now;
+            $wpdb->insert($table,$data);
+        }
+
+        $expected_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT floor_id) FROM {$wpdb->prefix}hrim_occupancy_check_rooms WHERE occupancy_check_id=%d",$session_id));
+        if(!$expected_floors){
+            $expected_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT r.floor_id) FROM {$wpdb->prefix}hrim_rooms r INNER JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id WHERE r.hotel_id=%d AND r.status='active' AND LOWER(TRIM(at.name))='room'",$hotel_id));
+        }
+        $saved_floors=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE occupancy_check_id=%d",$session_id));
+        $sum=(int)$wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(system_count),0) FROM {$table} WHERE occupancy_check_id=%d",$session_id));
+        $total=$saved_floors>0?$sum:null;
+        $complete=($expected_floors>0 && $saved_floors>=$expected_floors);
+        $wpdb->update($wpdb->prefix.'hrim_occupancy_checks',[
+            'system_count'=>$total,
+            'system_updated_by'=>$uid,
+            'updated_at'=>$now,
+        ],['id'=>$session_id]);
+
+        wp_send_json_success([
+            'count'=>max(0,intval($count_raw)),
+            'total'=>$total,
+            'complete'=>$complete,
+            'editable_until'=>time()+300,
+            'updated_at'=>$this->ist_date('d/m/y h:i A',$now),
+            'message'=>'System Count saved automatically.'
+        ]);
+    }
+
     public function ajax_save_occupancy_system(){
         check_ajax_referer('hrim_ajax','nonce');
         if(!$this->can_manage()) wp_send_json_error(['message'=>'Only Manager or Owner can update system fields.'],403);
         global $wpdb;
         $id=absint($_POST['session_id']??0);
         $session=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_occupancy_checks WHERE id=%d",$id));
-        if(!$session) wp_send_json_error(['message'=>'Occupancy Check not found.'],404);
+        if(!$session) wp_send_json_error(['message'=>'System Vs Security record not found.'],404);
         $office_count_saved = !($session->system_count===null || $session->system_count==='');
         if($office_count_saved && !empty($session->updated_at)){
             $office_updated_ts=(new DateTime($session->updated_at,$this->ist_timezone()))->getTimestamp();
-            if((time()-$office_updated_ts)>300) wp_send_json_error(['message'=>'The 5-minute Office Count edit window has expired.','locked'=>true],403);
+            if((time()-$office_updated_ts)>300) wp_send_json_error(['message'=>'The 5-minute System Count edit window has expired.','locked'=>true],403);
         }
         $count=isset($_POST['system_count']) && $_POST['system_count']!=='' ? max(0,intval($_POST['system_count'])) : null;
         $user_id=get_current_user_id();
@@ -1512,19 +2268,19 @@ class HRIM_Core {
                 $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_periodic_task_instances (task_id,due_date,status,assigned_to,created_at) VALUES (%d,%s,%s,%d,%s)",$t->id,$due,$due<$today?'overdue':'due',0,$this->ist_now_mysql()));
                 $instance_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_periodic_task_instances WHERE task_id=%d AND due_date=%s LIMIT 1",$t->id,$due));
                 if($instance_id){
-                    $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_periodic_task_rooms(instance_id,room_id,category_id) SELECT %d,r.id,r.category_id FROM {$wpdb->prefix}hrim_rooms r JOIN {$wpdb->prefix}hrim_periodic_task_categories c ON c.category_id=r.category_id WHERE c.task_id=%d AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')",$instance_id,$t->id));
+                    $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_periodic_task_rooms(instance_id,room_id,category_id) SELECT %d,r.id,r.category_id FROM {$wpdb->prefix}hrim_rooms r JOIN {$wpdb->prefix}hrim_periodic_task_categories c ON c.category_id=r.category_id WHERE c.task_id=%d AND (COALESCE(%d,0)=0 OR r.asset_type_id=%d) AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')",$instance_id,$t->id,(int)($t->asset_type_id??0),(int)($t->asset_type_id??0)));
                 }
                 $due=$this->periodic_next_date($t->start_date,$t->periodicity,date('Y-m-d',strtotime($due.' +1 day')));
             }
         }
     }
     public function periodic_tasks_shortcode(){
-        if(!$this->can_manage() && !current_user_can('hrim_perform_inspections')) return $this->shell('Periodic Tasks','<div class="hrim-alert error">You do not have access.</div>','periodic_tasks');
+        if(!$this->can_manage() && !current_user_can('hrim_perform_inspections')) return $this->shell('Periodic Task List','<div class="hrim-alert error">You do not have access.</div>','periodic_tasks');
         global $wpdb; $this->generate_periodic_instances();
         $tasks=$wpdb->get_results("SELECT t.*,d.name department_name FROM {$wpdb->prefix}hrim_periodic_tasks t LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=t.department_id ORDER BY t.id DESC");
-        $categories=$wpdb->get_results("SELECT c.id,c.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE (r.category_id=c.id OR (COALESCE(r.category_id,0)=0 AND TRIM(LOWER(r.category))=TRIM(LOWER(c.name)))) AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_room_categories c WHERE LOWER(TRIM(COALESCE(c.status,'active'))) IN ('active','1','yes') ORDER BY c.name");
+        $asset_types=$wpdb->get_results("SELECT at.id,at.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE r.asset_type_id=at.id AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_asset_types at WHERE LOWER(TRIM(COALESCE(at.status,'active'))) IN ('active','1','yes') ORDER BY at.sort_order,at.name");
         $sections=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
-        $departments=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_departments WHERE status='active' ORDER BY name");
+        $departments=$wpdb->get_results("SELECT d.id,d.name,d.department_head_user_id,u.display_name department_head_name FROM {$wpdb->prefix}hrim_departments d LEFT JOIN {$wpdb->users} u ON u.ID=d.department_head_user_id WHERE d.status='active' ORDER BY d.name");
         $edit_id=absint($_GET['edit']??0); $edit=$edit_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_periodic_tasks WHERE id=%d",$edit_id)):null;
         $sel_c=$edit?$wpdb->get_col($wpdb->prepare("SELECT category_id FROM {$wpdb->prefix}hrim_periodic_task_categories WHERE task_id=%d",$edit_id)):[];
         $sel_s=$edit?$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_periodic_task_sections WHERE task_id=%d",$edit_id)):[];
@@ -1545,31 +2301,28 @@ class HRIM_Core {
             ORDER BY i.due_date DESC,i.id DESC LIMIT 100"); ?>
           <div class="hrim-table-wrap">
             <table class="hrim-table hrim-exportable">
-              <thead><tr><th>Sl.</th><th>Task</th><th>Department</th><th>Applicability</th><th>Sections</th><th>Due Date</th><th>Periodicity (Days)</th><th>Rooms</th><th>Action</th></tr></thead>
+              <thead><tr><th>Department</th><th>Task</th><th>Assets</th><th>Periodicity (Days)</th><th>Due Date</th><th>Action</th></tr></thead>
               <tbody>
               <?php foreach($instances as $i=>$x):
                 $total=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE instance_id=%d",$x->id));
               ?>
                 <tr>
-                  <td><?php echo $i+1;?></td>
-                  <td><?php echo esc_html($x->task_name);?></td>
                   <td><?php echo esc_html($x->department_name ?: '—');?></td>
-                  <td><?php echo esc_html($x->applicability_names ?: '—');?></td>
-                  <td><?php echo esc_html($x->section_names ?: '—');?></td>
-                  <td><?php echo esc_html($this->ist_date('d/m/y',$x->due_date));?></td>
+                  <td><?php echo esc_html($x->task_name);?></td>
+                  <td><?php echo $total?:'Not started';?></td>
                   <?php $period_days=is_numeric($x->periodicity) ? max(1,(int)$x->periodicity) : (['daily'=>1,'weekly'=>7,'fortnightly'=>14,'monthly'=>30,'quarterly'=>90,'half-yearly'=>180,'yearly'=>365][$x->periodicity] ?? 30); ?>
                   <td><?php echo esc_html($period_days);?></td>
-                  <td><?php echo $total?:'Not started';?></td>
+                  <td><?php echo esc_html($this->ist_date('d/m/y',$x->due_date));?></td>
                   <td><div class="hrim-periodic-actions"><?php if($this->can_manage()): ?><a class="hrim-action edit" title="Edit Periodic Task" href="<?php echo esc_url(add_query_arg('task_id',$x->task_id,$this->page_url('hotel-inspection-update-periodic-task')));?>"><span class="dashicons dashicons-edit"></span></a><form method="post" action="<?php echo esc_url(admin_url('admin-post.php'));?>" onsubmit="return confirm('Delete this scheduled task?');"><?php wp_nonce_field('hrim_delete_periodic_instance');?><input type="hidden" name="action" value="hrim_delete_periodic_instance"><input type="hidden" name="id" value="<?php echo esc_attr($x->id);?>"><button class="hrim-action delete" type="submit" title="Delete"><span class="dashicons dashicons-trash"></span></button></form><?php endif; ?></div></td>
                 </tr>
               <?php endforeach; if(!$instances): ?>
-                <tr><td colspan="9">No task schedule found.</td></tr>
+                <tr><td colspan="6">No task schedule found.</td></tr>
               <?php endif; ?>
               </tbody>
             </table>
           </div>
         </div>
-        <?php return $this->shell('Periodic Tasks',ob_get_clean(),'periodic_tasks');
+        <?php return $this->shell('Periodic Task List',ob_get_clean(),'periodic_tasks');
     }
     public function delete_periodic_instance(){
         if(!$this->can_manage()) wp_die('Access denied');
@@ -1584,12 +2337,24 @@ class HRIM_Core {
     }
 
     public function schedule_tasks_in_progress_shortcode(){
-        if(!$this->can_manage() && !current_user_can('hrim_perform_inspections')) return $this->shell('Schedule Tasks In Progress','<div class="hrim-alert error">You do not have access.</div>','schedule_tasks_in_progress');
+        if(!$this->can_manage() && !current_user_can('hrim_perform_inspections')) return $this->shell('Due Periodic Tasks','<div class="hrim-alert error">You do not have access.</div>','schedule_tasks_in_progress');
         global $wpdb; $this->generate_periodic_instances();
         if(isset($_GET['instance_id'])) return $this->periodic_instance_view(absint($_GET['instance_id']));
         $today=(new DateTime('now',$this->ist_timezone()))->format('Y-m-d');
-        $sql="SELECT i.*,t.task_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified') ORDER BY i.due_date ASC,i.id ASC";
-        $instances=$wpdb->get_results($wpdb->prepare($sql,$today));
+        $schedule_scope_sql='';
+        $schedule_scope_args=[];
+        if(!$this->is_global_department_user()){
+            $schedule_department_ids=$this->user_department_ids();
+            if($schedule_department_ids){
+                $schedule_placeholders=implode(',',array_fill(0,count($schedule_department_ids),'%d'));
+                $schedule_scope_sql=" AND t.department_id IN ({$schedule_placeholders})";
+                $schedule_scope_args=$schedule_department_ids;
+            }else{
+                $schedule_scope_sql=' AND 1=0';
+            }
+        }
+        $sql="SELECT i.*,t.task_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.due_date<=%s AND LOWER(TRIM(COALESCE(i.status,'due'))) NOT IN ('completed','verified','cancelled','deleted'){$schedule_scope_sql} ORDER BY i.due_date ASC,i.id ASC";
+        $instances=$wpdb->get_results($wpdb->prepare($sql,array_merge([$today],$schedule_scope_args)));
         ob_start(); ?>
         <div class="hrim-panel hrim-schedule-task-list-panel">
           <div class="hrim-table-tools hrim-schedule-task-tools"><input type="search" class="hrim-table-search" placeholder=""><?php echo $this->excel_button('schedule-tasks-in-progress'); ?></div>
@@ -1605,7 +2370,7 @@ class HRIM_Core {
           <?php endforeach; if(!$instances): ?><tr><td colspan="8">No scheduled tasks are due.</td></tr><?php endif; ?>
           </tbody></table></div>
         </div>
-        <?php return $this->shell('Schedule Tasks In Progress',ob_get_clean(),'schedule_tasks_in_progress');
+        <?php return $this->shell('Due Periodic Tasks',ob_get_clean(),'schedule_tasks_in_progress');
     }
 
     public function delete_schedule_task_instance(){
@@ -1614,11 +2379,19 @@ class HRIM_Core {
         global $wpdb;
         $id=absint($_POST['id']??0);
         if($id){
+            // Keep a cancelled instance as a tombstone. Deleting the instance row causes
+            // generate_periodic_instances() to recreate the same due cycle immediately.
             $wpdb->delete($wpdb->prefix.'hrim_periodic_task_update_log',['instance_id'=>$id]);
             $wpdb->delete($wpdb->prefix.'hrim_periodic_task_rooms',['instance_id'=>$id]);
-            $wpdb->delete($wpdb->prefix.'hrim_periodic_task_instances',['id'=>$id]);
+            $wpdb->update(
+                $wpdb->prefix.'hrim_periodic_task_instances',
+                ['status'=>'cancelled','updated_at'=>$this->ist_now_mysql()],
+                ['id'=>$id],
+                ['%s','%s'],
+                ['%d']
+            );
         }
-        wp_safe_redirect($this->page_url('hotel-inspection-schedule-tasks-in-progress'));
+        wp_safe_redirect(add_query_arg(['hrim_saved'=>1,'hrim_message'=>'Scheduled task deleted successfully.'],$this->page_url('hotel-inspection-schedule-tasks-in-progress')));
         exit;
     }
 
@@ -1633,11 +2406,11 @@ class HRIM_Core {
     }
 
     public function add_periodic_task_shortcode(){
-        if(!$this->can_manage()) return $this->shell('Add Periodic Tasks','<div class="hrim-alert error">You do not have access.</div>','add_periodic_task');
+        if(!$this->can_manage()) return $this->shell('Add Periodic Task','<div class="hrim-alert error">You do not have access.</div>','add_periodic_task');
         global $wpdb;
-        $categories=$wpdb->get_results("SELECT c.id,c.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE (r.category_id=c.id OR (COALESCE(r.category_id,0)=0 AND TRIM(LOWER(r.category))=TRIM(LOWER(c.name)))) AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_room_categories c WHERE LOWER(TRIM(COALESCE(c.status,'active'))) IN ('active','1','yes') ORDER BY c.name");
+        $asset_types=$wpdb->get_results("SELECT at.id,at.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE r.asset_type_id=at.id AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_asset_types at WHERE LOWER(TRIM(COALESCE(at.status,'active'))) IN ('active','1','yes') ORDER BY at.sort_order,at.name");
         $sections=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
-        $departments=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_departments WHERE status='active' ORDER BY name");
+        $departments=$wpdb->get_results("SELECT d.id,d.name,d.department_head_user_id,u.display_name department_head_name FROM {$wpdb->prefix}hrim_departments d LEFT JOIN {$wpdb->users} u ON u.ID=d.department_head_user_id WHERE d.status='active' ORDER BY d.name");
         ob_start(); ?>
         <div class="hrim-panel hrim-periodic-add-panel">
           <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="hrim-form hrim-periodic-form" id="hrimAddPeriodicTaskForm">
@@ -1646,9 +2419,9 @@ class HRIM_Core {
             <input type="hidden" name="id" value="0">
             <div class="hrim-periodic-grid">
               <label><span>Task *</span><input name="task_name" required placeholder="Enter task name"></label>
-              <label><span>Applicability *</span><select id="hrimPeriodicCategories" name="category_ids[]" multiple required><?php foreach($categories as $index=>$c):?><option value="<?php echo esc_attr($c->id);?>" data-room-count="<?php echo esc_attr((int)$c->room_count);?>" <?php selected($index===0);?>><?php echo esc_html($c->name);?></option><?php endforeach;?></select><small>Select one or more room categories.</small></label>
+              <label><span>Asset Type *</span><select id="hrimPeriodicAssetType" name="asset_type_id" required><option value="">Select Asset Type</option><?php foreach($asset_types as $index=>$asset_type):?><option value="<?php echo esc_attr($asset_type->id);?>" data-room-count="<?php echo esc_attr((int)$asset_type->room_count);?>" <?php selected($index===0);?>><?php echo esc_html($asset_type->name);?></option><?php endforeach;?></select></label>
               <label><span>Periodicity (Days) *</span><input type="number" min="1" step="1" name="periodicity" required value="1" placeholder="Enter number of days"></label>
-              <label><span>No of Rooms</span><input id="hrimPeriodicCount" class="hrim-calculated-field" type="text" readonly aria-readonly="true" value="0" style="background:#eef1f5!important;background-color:#eef1f5!important;color:#475569!important;border-color:#c4cbd5!important;box-shadow:none!important;cursor:not-allowed!important;opacity:1!important;"><small>Automatically calculated from selected room categories.</small></label>
+              <label><span>No of Rooms</span><input id="hrimPeriodicCount" class="hrim-calculated-field" type="text" readonly aria-readonly="true" value="0" style="background:#eef1f5!important;background-color:#eef1f5!important;color:#475569!important;border-color:#c4cbd5!important;box-shadow:none!important;cursor:not-allowed!important;opacity:1!important;"><small>Automatically calculated from the selected asset type.</small></label>
               <label><span>Select Sections *</span><select name="section_ids[]" multiple required data-initial-empty="1"><?php foreach($sections as $sec):?><option value="<?php echo esc_attr($sec->id);?>"><?php echo esc_html($sec->name);?></option><?php endforeach;?></select></label>
               <label><span>Start Date *</span><input type="date" name="start_date" required value="<?php echo esc_attr((new DateTime('now',$this->ist_timezone()))->format('Y-m-d'));?>"></label>
               <label><span>Responsible Department *</span><select id="hrimPeriodicDepartment" name="department_id" required><option value="">Select Department</option><?php foreach($departments as $d):?><option value="<?php echo esc_attr($d->id);?>"><?php echo esc_html($d->name);?></option><?php endforeach;?></select></label>
@@ -1659,21 +2432,14 @@ class HRIM_Core {
         </div>
         <script>
         document.addEventListener('DOMContentLoaded',function(){
-          const categories=document.getElementById('hrimPeriodicCategories');
           const count=document.getElementById('hrimPeriodicCount');
+          const assetType=document.getElementById('hrimPeriodicAssetType');
           const updateCount=function(){
-            let total=0;
-            if(categories){
-              let selected=Array.from(categories.options).filter(function(option){ return option.selected; });
-              if(!selected.length && categories.options.length){
-                categories.options[0].selected=true;
-                selected=[categories.options[0]];
-              }
-              selected.forEach(function(option){ total+=parseInt(option.dataset.roomCount||'0',10); });
-            }
-            if(count) count.value=String(total);
+            if(!count || !assetType) return;
+            const option=assetType.options[assetType.selectedIndex];
+            count.value=option ? String(parseInt(option.dataset.roomCount||'0',10)) : '0';
           };
-          if(categories){ categories.addEventListener('change',updateCount); updateCount(); setTimeout(updateCount,250); }
+          if(assetType){ assetType.addEventListener('change',updateCount); updateCount(); setTimeout(updateCount,250); }
 
           const periodicForm=document.getElementById('hrimAddPeriodicTaskForm');
           const saveButton=document.getElementById('hrimSavePeriodicTaskButton');
@@ -1686,7 +2452,7 @@ class HRIM_Core {
           }
         });
         </script>
-        <?php return $this->shell('Add Periodic Tasks',ob_get_clean(),'add_periodic_task');
+        <?php return $this->shell('Add Periodic Task',ob_get_clean(),'add_periodic_task');
     }
 
 
@@ -1696,10 +2462,9 @@ class HRIM_Core {
         $task_id=absint($_GET['task_id']??0);
         $task=$task_id?$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_periodic_tasks WHERE id=%d",$task_id)):null;
         if(!$task) return $this->shell('Update Periodic Task','<div class="hrim-alert error">Periodic task not found.</div>','periodic_tasks');
-        $categories=$wpdb->get_results("SELECT c.id,c.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE (r.category_id=c.id OR (COALESCE(r.category_id,0)=0 AND TRIM(LOWER(r.category))=TRIM(LOWER(c.name)))) AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_room_categories c WHERE LOWER(TRIM(COALESCE(c.status,'active'))) IN ('active','1','yes') ORDER BY c.name");
+        $asset_types=$wpdb->get_results("SELECT at.id,at.name,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms r WHERE r.asset_type_id=at.id AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')) room_count FROM {$wpdb->prefix}hrim_asset_types at WHERE LOWER(TRIM(COALESCE(at.status,'active'))) IN ('active','1','yes') ORDER BY at.sort_order,at.name");
         $sections=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
-        $departments=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_departments WHERE status='active' ORDER BY name");
-        $sel_c=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT category_id FROM {$wpdb->prefix}hrim_periodic_task_categories WHERE task_id=%d",$task_id)));
+        $departments=$wpdb->get_results("SELECT d.id,d.name,d.department_head_user_id,u.display_name department_head_name FROM {$wpdb->prefix}hrim_departments d LEFT JOIN {$wpdb->users} u ON u.ID=d.department_head_user_id WHERE d.status='active' ORDER BY d.name");
         $sel_s=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_periodic_task_sections WHERE task_id=%d",$task_id)));
         $period_days=is_numeric($task->periodicity)?max(1,(int)$task->periodicity):(['daily'=>1,'weekly'=>7,'fortnightly'=>14,'monthly'=>30,'quarterly'=>90,'half-yearly'=>180,'yearly'=>365][$task->periodicity]??30);
         $periodic_questions=$wpdb->get_results("SELECT q.id,q.section_id,q.question,q.required_flag,s.name section_name,s.sort_order section_order,q.sort_order FROM {$wpdb->prefix}hrim_questions q INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE q.is_library=1 AND s.status='active' ORDER BY s.sort_order,s.name,q.sort_order,q.id");
@@ -1712,9 +2477,9 @@ class HRIM_Core {
             <input type="hidden" name="id" value="<?php echo esc_attr($task_id);?>">
             <div class="hrim-periodic-grid">
               <label><span>Task *</span><input name="task_name" required value="<?php echo esc_attr($task->task_name);?>" placeholder="Enter task name"></label>
-              <label><span>Applicability *</span><select id="hrimPeriodicCategories" name="category_ids[]" multiple required><?php foreach($categories as $c):?><option value="<?php echo esc_attr($c->id);?>" data-room-count="<?php echo esc_attr((int)$c->room_count);?>" <?php selected(in_array((int)$c->id,$sel_c,true));?>><?php echo esc_html($c->name);?></option><?php endforeach;?></select><small>Select one or more room categories.</small></label>
+              <label><span>Asset Type *</span><select id="hrimPeriodicAssetType" name="asset_type_id" required><option value="">Select Asset Type</option><?php foreach($asset_types as $asset_type):?><option value="<?php echo esc_attr($asset_type->id);?>" data-room-count="<?php echo esc_attr((int)$asset_type->room_count);?>" <?php selected((int)($task->asset_type_id??0),(int)$asset_type->id);?>><?php echo esc_html($asset_type->name);?></option><?php endforeach;?></select></label>
               <label><span>Periodicity (Days) *</span><input type="number" min="1" step="1" name="periodicity" required value="<?php echo esc_attr($period_days);?>"></label>
-              <label><span>No of Rooms</span><input id="hrimPeriodicCount" class="hrim-calculated-field" type="text" readonly aria-readonly="true" value="0" style="background:#eef1f5!important;background-color:#eef1f5!important;color:#475569!important;border-color:#c4cbd5!important;box-shadow:none!important;cursor:not-allowed!important;opacity:1!important;"><small>Automatically calculated from selected room categories.</small></label>
+              <label><span>No of Rooms</span><input id="hrimPeriodicCount" class="hrim-calculated-field" type="text" readonly aria-readonly="true" value="0" style="background:#eef1f5!important;background-color:#eef1f5!important;color:#475569!important;border-color:#c4cbd5!important;box-shadow:none!important;cursor:not-allowed!important;opacity:1!important;"><small>Automatically calculated from the selected asset type.</small></label>
               <label><span>Select Sections *</span><select name="section_ids[]" multiple required><?php foreach($sections as $sec):?><option value="<?php echo esc_attr($sec->id);?>" <?php selected(in_array((int)$sec->id,$sel_s,true));?>><?php echo esc_html($sec->name);?></option><?php endforeach;?></select></label>
               <label><span>Start Date *</span><input type="date" name="start_date" required value="<?php echo esc_attr($task->start_date);?>"></label>
               <label><span>Responsible Department *</span><select id="hrimPeriodicDepartment" name="department_id" required><option value="">Select Department</option><?php foreach($departments as $d):?><option value="<?php echo esc_attr($d->id);?>" <?php selected((int)$task->department_id,(int)$d->id);?>><?php echo esc_html($d->name);?></option><?php endforeach;?></select></label>
@@ -1729,14 +2494,14 @@ class HRIM_Core {
         </div>
         <script>
         document.addEventListener('DOMContentLoaded',function(){
-          const categories=document.getElementById('hrimPeriodicCategories');
           const count=document.getElementById('hrimPeriodicCount');
+          const assetType=document.getElementById('hrimPeriodicAssetType');
           const updateCount=function(){
-            let total=0;
-            if(categories) Array.from(categories.options).filter(function(option){return option.selected;}).forEach(function(option){total+=parseInt(option.dataset.roomCount||'0',10);});
-            if(count) count.value=String(total);
+            if(!count || !assetType) return;
+            const option=assetType.options[assetType.selectedIndex];
+            count.value=option ? String(parseInt(option.dataset.roomCount||'0',10)) : '0';
           };
-          if(categories){categories.addEventListener('change',updateCount);updateCount();setTimeout(updateCount,250);}
+          if(assetType){assetType.addEventListener('change',updateCount);updateCount();setTimeout(updateCount,250);}
           const selectedSections=document.querySelector('select[name="section_ids[]"]');
           const syncCheckpointSections=function(){
             if(!selectedSections)return;
@@ -1752,10 +2517,10 @@ class HRIM_Core {
 
     public function save_periodic_task(){
         if(!$this->can_manage()) wp_die('Access denied'); check_admin_referer('hrim_save_periodic_task'); global $wpdb;
-        $id=absint($_POST['id']??0); $periodicity=max(1,absint($_POST['periodicity']??1)); $data=['task_name'=>sanitize_text_field($_POST['task_name']??''),'periodicity'=>(string)$periodicity,'start_date'=>sanitize_text_field($_POST['start_date']??''),'department_id'=>absint($_POST['department_id']??0),'assigned_to'=>0,'status'=>sanitize_key($_POST['status']??'active'),'updated_at'=>$this->ist_now_mysql()];
+        $id=absint($_POST['id']??0); $periodicity=max(1,absint($_POST['periodicity']??1)); $data=['task_name'=>sanitize_text_field($_POST['task_name']??''),'asset_type_id'=>absint($_POST['asset_type_id']??0),'periodicity'=>(string)$periodicity,'start_date'=>sanitize_text_field($_POST['start_date']??''),'department_id'=>absint($_POST['department_id']??0),'assigned_to'=>0,'status'=>sanitize_key($_POST['status']??'active'),'updated_at'=>$this->ist_now_mysql()];
         if(!$id){$data['reminder_value']=0;$data['reminder_unit']='days';}
         if($id)$wpdb->update($wpdb->prefix.'hrim_periodic_tasks',$data,['id'=>$id]); else{$data['created_by']=get_current_user_id();$data['created_at']=$this->ist_now_mysql();$wpdb->insert($wpdb->prefix.'hrim_periodic_tasks',$data);$id=$wpdb->insert_id;}
-        $wpdb->delete($wpdb->prefix.'hrim_periodic_task_categories',['task_id'=>$id]); foreach(array_map('absint',(array)($_POST['category_ids']??[])) as $cid)$wpdb->insert($wpdb->prefix.'hrim_periodic_task_categories',['task_id'=>$id,'category_id'=>$cid]);
+        $wpdb->delete($wpdb->prefix.'hrim_periodic_task_categories',['task_id'=>$id]); $asset_type_id=absint($data['asset_type_id']); if($asset_type_id){$category_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT DISTINCT category_id FROM {$wpdb->prefix}hrim_rooms WHERE asset_type_id=%d AND category_id>0 AND LOWER(TRIM(COALESCE(status,'active'))) IN ('active','1','yes')",$asset_type_id))); foreach($category_ids as $cid)$wpdb->insert($wpdb->prefix.'hrim_periodic_task_categories',['task_id'=>$id,'category_id'=>$cid]);}
         $wpdb->delete($wpdb->prefix.'hrim_periodic_task_sections',['task_id'=>$id]); $selected_section_ids=array_map('absint',(array)($_POST['section_ids']??[])); foreach($selected_section_ids as $sid)$wpdb->insert($wpdb->prefix.'hrim_periodic_task_sections',['task_id'=>$id,'section_id'=>$sid]);
         $wpdb->delete($wpdb->prefix.'hrim_periodic_task_question_exclusions',['task_id'=>$id]);
         if(array_key_exists('included_periodic_question_ids',$_POST)){
@@ -1770,10 +2535,10 @@ class HRIM_Core {
     }
     public function delete_periodic_task(){if(!$this->can_manage())wp_die('Access denied');check_admin_referer('hrim_delete_periodic_task');global $wpdb;$id=absint($_POST['id']??0);$has=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_instances WHERE task_id=%d AND status IN ('completed','verified')",$id));if($has)$wpdb->update($wpdb->prefix.'hrim_periodic_tasks',['status'=>'inactive'],['id'=>$id]);else{foreach(['categories','sections','instances'] as $x)$wpdb->delete($wpdb->prefix.'hrim_periodic_task_'.$x,['task_id'=>$id]);$wpdb->delete($wpdb->prefix.'hrim_periodic_tasks',['id'=>$id]);}wp_safe_redirect($this->page_url('hotel-inspection-periodic-tasks'));exit;}
     private function periodic_instance_view($id){
-        global $wpdb;$ins=$wpdb->get_row($wpdb->prepare("SELECT i.*,t.task_name,t.department_id,t.periodicity FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.id=%d",$id));if(!$ins)return $this->shell('Schedule Tasks In Progress','<div class="hrim-alert error">Task instance not found.</div>','schedule_tasks_in_progress');
-        $count=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE instance_id=%d",$id));if(!$count){$wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_periodic_task_rooms(instance_id,room_id,category_id) SELECT %d,r.id,r.category_id FROM {$wpdb->prefix}hrim_rooms r JOIN {$wpdb->prefix}hrim_periodic_task_categories c ON c.category_id=r.category_id WHERE c.task_id=%d AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')",$id,$ins->task_id));$wpdb->update($wpdb->prefix.'hrim_periodic_task_instances',['status'=>'in_progress','started_at'=>$this->ist_now_mysql()],['id'=>$id]);}
+        global $wpdb;$ins=$wpdb->get_row($wpdb->prepare("SELECT i.*,t.task_name,t.department_id,t.periodicity,t.asset_type_id FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE i.id=%d",$id));if(!$ins)return $this->shell('Due Periodic Tasks','<div class="hrim-alert error">Task instance not found.</div>','schedule_tasks_in_progress');
+        $count=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_rooms WHERE instance_id=%d",$id));if(!$count){$wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_periodic_task_rooms(instance_id,room_id,category_id) SELECT %d,r.id,r.category_id FROM {$wpdb->prefix}hrim_rooms r JOIN {$wpdb->prefix}hrim_periodic_task_categories c ON c.category_id=r.category_id WHERE c.task_id=%d AND (COALESCE(%d,0)=0 OR r.asset_type_id=%d) AND LOWER(TRIM(COALESCE(r.status,'active'))) IN ('active','1','yes')",$id,$ins->task_id,(int)($ins->asset_type_id??0),(int)($ins->asset_type_id??0)));$wpdb->update($wpdb->prefix.'hrim_periodic_task_instances',['status'=>'in_progress','started_at'=>$this->ist_now_mysql()],['id'=>$id]);}
         $room_id=absint($_GET['room_id']??0); if($room_id)return $this->periodic_room_form($ins,$room_id);
-        $rooms=$wpdb->get_results($wpdb->prepare("SELECT tr.*,r.room_no,c.name category_name FROM {$wpdb->prefix}hrim_periodic_task_rooms tr JOIN {$wpdb->prefix}hrim_rooms r ON r.id=tr.room_id LEFT JOIN {$wpdb->prefix}hrim_room_categories c ON c.id=tr.category_id WHERE tr.instance_id=%d ORDER BY c.name,CAST(r.room_no AS UNSIGNED),r.room_no",$id));ob_start();?><div class="hrim-panel"><h2><?php echo esc_html($ins->task_name);?></h2><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Room Category</th><th>Room</th><th>Task</th><th>Status</th><th>Last Update Date</th><th>Last Update Remarks</th><th>Next Action Date</th><th>Action</th></tr></thead><tbody><?php foreach($rooms as $r): $room_task_status=strtolower(trim((string)($r->status??'pending'))); $room_task_status=in_array($room_task_status,['completed','complete','1'],true)?'completed':'pending'; $last_update_raw=!empty($r->updated_at)?$r->updated_at:(!empty($r->completed_at)?$r->completed_at:''); $last_update_date=$last_update_raw?$this->ist_date('d/m/y',$last_update_raw):'—'; $last_update_remarks=trim((string)($r->remarks??'')); $periodicity_days=max(1,absint($ins->periodicity??1)); if($room_task_status==='completed' && !empty($r->completed_at)){ $next_action_ts=strtotime($r->completed_at.' +'.$periodicity_days.' days'); $next_action_date=$next_action_ts?$this->ist_date('d/m/y',date('Y-m-d H:i:s',$next_action_ts)):'—'; } else { $next_action_date=$this->ist_date('d/m/y',$ins->due_date); } ?><tr><td><?php echo esc_html($r->category_name);?></td><td><?php echo esc_html($r->room_no);?></td><td><?php echo esc_html($ins->task_name);?></td><td><span class="hrim-status <?php echo esc_attr($room_task_status);?>"><?php echo esc_html(ucfirst($room_task_status));?></span></td><td><?php echo esc_html($last_update_date);?></td><td><?php echo $last_update_remarks!==''?esc_html($last_update_remarks):'—';?></td><td><?php echo esc_html($next_action_date);?></td><td><a class="hrim-action edit" title="Update Periodic Task" href="<?php echo esc_url(add_query_arg(['instance_id'=>$id,'room_id'=>$r->room_id],$this->page_url('hotel-inspection-schedule-tasks-in-progress')));?>"><span class="dashicons dashicons-edit"></span></a></td></tr><?php endforeach;?></tbody></table></div></div><?php return $this->shell('Periodic Task',ob_get_clean(),'schedule_tasks_in_progress');
+        $rooms=$wpdb->get_results($wpdb->prepare("SELECT tr.*,r.room_no,c.name category_name FROM {$wpdb->prefix}hrim_periodic_task_rooms tr JOIN {$wpdb->prefix}hrim_rooms r ON r.id=tr.room_id LEFT JOIN {$wpdb->prefix}hrim_room_categories c ON c.id=tr.category_id WHERE tr.instance_id=%d ORDER BY c.name,CAST(r.room_no AS UNSIGNED),r.room_no",$id));ob_start();?><div class="hrim-panel"><h2><?php echo esc_html($ins->task_name);?></h2><div class="hrim-table-wrap hrim-periodic-room-task-wrap"><table class="hrim-table hrim-periodic-room-task-table"><colgroup><col class="hrim-col-asset-category"><col class="hrim-col-asset"><col class="hrim-col-task"><col class="hrim-col-status"><col class="hrim-col-update-date"><col class="hrim-col-update-remarks"><col class="hrim-col-next-date"><col class="hrim-col-action"></colgroup><thead><tr><th>Asset Category</th><th>Asset</th><th>Task</th><th>Status</th><th>Last Update Date</th><th>Last Update Remarks</th><th>Next Action Date</th><th>Action</th></tr></thead><tbody><?php foreach($rooms as $r): $room_task_status=strtolower(trim((string)($r->status??'pending'))); $room_task_status=in_array($room_task_status,['completed','complete','1'],true)?'completed':'pending'; $last_update_raw=!empty($r->updated_at)?$r->updated_at:(!empty($r->completed_at)?$r->completed_at:''); $last_update_date=$last_update_raw?$this->ist_date('d/m/y',$last_update_raw):'—'; $last_update_remarks=trim((string)($r->remarks??'')); $periodicity_days=max(1,absint($ins->periodicity??1)); if($room_task_status==='completed' && !empty($r->completed_at)){ $next_action_ts=strtotime($r->completed_at.' +'.$periodicity_days.' days'); $next_action_date=$next_action_ts?$this->ist_date('d/m/y',date('Y-m-d H:i:s',$next_action_ts)):'—'; } else { $next_action_date=$this->ist_date('d/m/y',$ins->due_date); } ?><tr><td><?php echo esc_html($r->category_name);?></td><td><?php echo esc_html($r->room_no);?></td><td><?php echo esc_html($ins->task_name);?></td><td><span class="hrim-status <?php echo esc_attr($room_task_status);?>"><?php echo esc_html(ucfirst($room_task_status));?></span></td><td><?php echo esc_html($last_update_date);?></td><td><?php echo $last_update_remarks!==''?esc_html($last_update_remarks):'—';?></td><td><?php echo esc_html($next_action_date);?></td><td><a class="hrim-action edit" title="Update Periodic Task" href="<?php echo esc_url(add_query_arg(['instance_id'=>$id,'room_id'=>$r->room_id],$this->page_url('hotel-inspection-schedule-tasks-in-progress')));?>"><span class="dashicons dashicons-edit"></span></a></td></tr><?php endforeach;?></tbody></table></div></div><?php return $this->shell('Periodic Task',ob_get_clean(),'schedule_tasks_in_progress');
     }
     private function periodic_room_form($ins,$room_id){
         global $wpdb;
@@ -1789,8 +2554,9 @@ class HRIM_Core {
              INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=pts.section_id AND s.status='active'
              INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1
              LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id
+             LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id
              LEFT JOIN {$wpdb->prefix}hrim_periodic_task_question_exclusions pex ON pex.task_id=pts.task_id AND pex.question_id=q.id
-             WHERE pts.task_id=%d AND rx.question_id IS NULL AND pex.question_id IS NULL
+             WHERE pts.task_id=%d AND rx.question_id IS NULL AND rr.question_id IS NULL AND pex.question_id IS NULL
              UNION ALL
              SELECT q.id,q.section_id,s.name section_name,s.sort_order section_order,q.question,q.required_flag,q.sort_order
              FROM {$wpdb->prefix}hrim_periodic_task_sections pts
@@ -1800,7 +2566,7 @@ class HRIM_Core {
              LEFT JOIN {$wpdb->prefix}hrim_periodic_task_question_exclusions pex ON pex.task_id=pts.task_id AND pex.question_id=q.id
              WHERE pts.task_id=%d AND pex.question_id IS NULL
              ORDER BY section_order,section_name,sort_order,id",
-            $room_id,(int)$ins->task_id,$room_id,(int)$ins->task_id
+            $room_id,$room_id,(int)$ins->task_id,$room_id,(int)$ins->task_id
         ));
         $answer_rows=$wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}hrim_periodic_task_answers WHERE instance_id=%d AND room_id=%d",
@@ -1941,22 +2707,23 @@ class HRIM_Core {
         }
 
         $questions=$wpdb->get_results($wpdb->prepare(
-            "SELECT DISTINCT q.id,q.section_id,q.required_flag,q.question,s.department_id
+            "SELECT DISTINCT q.id,q.section_id,q.required_flag,q.question,COALESCE(NULLIF(q.department_id,0),s.department_id) department_id
              FROM {$wpdb->prefix}hrim_periodic_task_sections pts
              INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=pts.section_id AND s.status='active'
              INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1
              LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id
+             LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id
              LEFT JOIN {$wpdb->prefix}hrim_periodic_task_question_exclusions pex ON pex.task_id=pts.task_id AND pex.question_id=q.id
-             WHERE pts.task_id=%d AND rx.question_id IS NULL AND pex.question_id IS NULL
+             WHERE pts.task_id=%d AND rx.question_id IS NULL AND rr.question_id IS NULL AND pex.question_id IS NULL
              UNION ALL
-             SELECT q.id,q.section_id,q.required_flag,q.question,s.department_id
+             SELECT q.id,q.section_id,q.required_flag,q.question,COALESCE(NULLIF(q.department_id,0),s.department_id) department_id
              FROM {$wpdb->prefix}hrim_periodic_task_sections pts
              INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=pts.section_id AND s.status='active'
              INNER JOIN {$wpdb->prefix}hrim_room_question_additions a ON a.room_id=%d
              INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id AND q.section_id=s.id
              LEFT JOIN {$wpdb->prefix}hrim_periodic_task_question_exclusions pex ON pex.task_id=pts.task_id AND pex.question_id=q.id
              WHERE pts.task_id=%d AND pex.question_id IS NULL",
-            $room_id,(int)$instance->task_id,$room_id,(int)$instance->task_id
+            $room_id,$room_id,(int)$instance->task_id,$room_id,(int)$instance->task_id
         ));
         $valid=[];
         foreach($questions as $q)$valid[(int)$q->id]=$q;
@@ -2007,7 +2774,7 @@ class HRIM_Core {
             $file_key='question_photo_'.$qid;
             if(!empty($_FILES[$file_key]['name'])){
                 $attachment_id=media_handle_upload($file_key,0);
-                if(!is_wp_error($attachment_id))$data['photo_attachment_id']=$attachment_id;
+                if(!is_wp_error($attachment_id)){$attachment_id=$this->optimize_roomscore_image_attachment($attachment_id);$data['photo_attachment_id']=$attachment_id;}
             }
             if($existing)$wpdb->update($wpdb->prefix.'hrim_periodic_task_answers',$data,['id'=>(int)$existing->id]);
             else $wpdb->insert($wpdb->prefix.'hrim_periodic_task_answers',$data);
@@ -2059,7 +2826,7 @@ class HRIM_Core {
         ];
         if(!empty($_FILES['task_photo']['name'])){
             $attachment_id=media_handle_upload('task_photo',0);
-            if(!is_wp_error($attachment_id))$room_data['photo_attachment_id']=$attachment_id;
+            if(!is_wp_error($attachment_id)){$attachment_id=$this->optimize_roomscore_image_attachment($attachment_id);$room_data['photo_attachment_id']=$attachment_id;}
         }
         $wpdb->update($room_table,$room_data,['instance_id'=>$instance_id,'room_id'=>$room_id],null,['%d','%d']);
 
@@ -2111,7 +2878,7 @@ class HRIM_Core {
 
     public function periodic_update_log_shortcode(){
         if(!$this->can_manage() && !current_user_can('hrim_perform_inspections')){
-            return $this->shell('Schedule Tasks History','<div class="hrim-alert error">You do not have access.</div>','periodic_update_log');
+            return $this->shell('Upcoming Periodic Tasks','<div class="hrim-alert error">You do not have access.</div>','periodic_update_log');
         }
         global $wpdb;
         if(!class_exists('HRIM_Activator')) require_once HRIM_DIR.'includes/class-hrim-activator.php';
@@ -2165,7 +2932,7 @@ class HRIM_Core {
                 </table>
             </div>
         </div>
-        <?php return $this->shell('Schedule Tasks History',ob_get_clean(),'periodic_update_log');
+        <?php return $this->shell('Upcoming Periodic Tasks',ob_get_clean(),'periodic_update_log');
     }
 
     public function history_shortcode(){
@@ -2201,7 +2968,7 @@ class HRIM_Core {
         [$department_where,$department_args]=$this->department_scope_sql('x');
         $where="({$where}) AND ({$department_where})";
         $args=array_merge((array)$args,$department_args);
-        $sql="SELECT x.*,i.attachment_ids inspection_attachment_ids,r.room_no,f.name floor_name,h.name hotel_name,se.name section_name,d.name department_name,u.display_name assigned_name,ru.display_name reported_name FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_inspections i ON i.id=x.inspection_id LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=COALESCE(NULLIF(x.room_id,0),i.room_id) LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=COALESCE(x.floor_id,r.floor_id) LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=COALESCE(x.hotel_id,r.hotel_id) LEFT JOIN {$wpdb->prefix}hrim_sections se ON se.id=x.section_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id LEFT JOIN {$wpdb->users} u ON u.ID=x.assigned_to LEFT JOIN {$wpdb->users} ru ON ru.ID=x.reported_by WHERE {$where} ORDER BY FIELD(x.status,'open','assigned','in_progress','reopened','resolved','verified','closed'),x.id DESC";
+        $sql="SELECT x.*,i.attachment_ids inspection_attachment_ids,r.room_no,at.name asset_type_name,f.name floor_name,h.name hotel_name,se.name section_name,d.name department_name,u.display_name assigned_name,ru.display_name reported_name FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_inspections i ON i.id=x.inspection_id LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=COALESCE(NULLIF(x.room_id,0),i.room_id) LEFT JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=COALESCE(x.floor_id,r.floor_id) LEFT JOIN {$wpdb->prefix}hrim_hotels h ON h.id=COALESCE(x.hotel_id,r.hotel_id) LEFT JOIN {$wpdb->prefix}hrim_sections se ON se.id=x.section_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id LEFT JOIN {$wpdb->users} u ON u.ID=x.assigned_to LEFT JOIN {$wpdb->users} ru ON ru.ID=x.reported_by WHERE {$where} ORDER BY FIELD(x.status,'open','assigned','in_progress','reopened','resolved','verified','closed'),x.id DESC";
         if($limit>0) $sql.=' LIMIT '.absint($limit);
         if($args) $sql=$wpdb->prepare($sql,$args);
         return $wpdb->get_results($sql);
@@ -2273,30 +3040,77 @@ class HRIM_Core {
         return '<div class="hrim-modal" id="hrimDocumentModal"><div class="hrim-modal-card hrim-modal-wide"><button class="hrim-modal-close" type="button">×</button><h2 id="hrimDocumentModalTitle">Photos</h2><div id="hrimDocumentModalBody" class="hrim-document-grid"></div></div></div>';
     }
 
+    private function issue_history_tables($issue_id){
+        global $wpdb;
+        $issue_id=absint($issue_id);
+        $rows=$wpdb->get_results($wpdb->prepare("SELECT u.*,usr.display_name updated_name FROM {$wpdb->prefix}hrim_issue_updates u LEFT JOIN {$wpdb->users} usr ON usr.ID=u.updated_by WHERE u.issue_id=%d ORDER BY u.update_date,u.id",$issue_id));
+        $progress=[]; $supervision=[];
+        foreach((array)$rows as $row){
+            if(strtolower((string)$row->update_type)==='supervision') $supervision[]=$row;
+            else $progress[]=$row;
+        }
+        ob_start(); ?>
+        <div class="hrim-issue-history-two-tables">
+          <div class="hrim-issue-history-block">
+            <div class="hrim-table-wrap"><table class="hrim-table hrim-issue-update-history-table"><thead><tr><th>Update Date</th><th>Updated By</th><th>Status</th><th>Update Remarks</th><th>Update Photo</th></tr></thead><tbody>
+            <?php if(!$progress): ?><tr><td></td><td></td><td></td><td></td><td></td></tr><?php else: foreach($progress as $u): $docs=$this->attachment_payload($u->attachment_ids??'',[
+                'date'=>$u->update_date?$this->ist_date('d/m/y, h:i A',$u->update_date):'',
+                'status'=>ucwords(str_replace('_',' ',$u->status?:'')),
+                'remarks'=>$u->remarks?:'',
+                'updated_by'=>$u->updated_name?:'',
+            ]); ?><tr><td><?php echo $u->update_date?esc_html($this->ist_date('d/m/y, h:i A',$u->update_date)):''; ?></td><td><?php echo esc_html($u->updated_name?:''); ?></td><td><?php echo esc_html(ucwords(str_replace('_',' ',$u->status?:''))); ?></td><td><?php echo trim((string)$u->remarks)!==''?nl2br(esc_html($u->remarks)):''; ?></td><td><?php echo $docs?$this->document_button($docs):''; ?></td></tr><?php endforeach; endif; ?>
+            </tbody></table></div>
+          </div>
+          <div class="hrim-issue-history-block">
+            <div class="hrim-table-wrap"><table class="hrim-table hrim-supervision-history-table"><thead><tr><th>Supervision Date</th><th>Supervision By</th><th>Supervision Remarks</th><th>Are you satisfied with the Work?</th></tr></thead><tbody>
+            <?php if(!$supervision): ?><tr><td></td><td></td><td></td><td></td></tr><?php else: foreach($supervision as $u):
+                $raw=(string)($u->remarks??''); $satisfied=''; $remarks=$raw;
+                if(preg_match('/Satisfied with work:\s*(Yes|No)/i',$raw,$m)) $satisfied=ucfirst(strtolower($m[1]));
+                if(preg_match('/Supervision Remarks:\s*(.*)$/is',$raw,$m)) $remarks=trim($m[1]);
+            ?><tr><td><?php echo $u->update_date?esc_html($this->ist_date('d/m/y, h:i A',$u->update_date)):''; ?></td><td><?php echo esc_html($u->updated_name?:''); ?></td><td><?php echo $remarks!==''?nl2br(esc_html($remarks)):''; ?></td><td><?php echo esc_html($satisfied); ?></td></tr><?php endforeach; endif; ?>
+            </tbody></table></div>
+          </div>
+        </div>
+        <?php return ob_get_clean();
+    }
+
+    private function issue_history_toggle_script(){
+        return '<script>(function(){function phoneWidth(){var vals=[];try{if(window.visualViewport&&window.visualViewport.width)vals.push(window.visualViewport.width);}catch(e){} try{if(window.innerWidth)vals.push(window.innerWidth);}catch(e){} try{if(document.documentElement&&document.documentElement.clientWidth)vals.push(document.documentElement.clientWidth);}catch(e){} try{if(window.screen&&window.screen.width)vals.push(window.screen.width);}catch(e){} return vals.length?Math.min.apply(Math,vals):9999;}function isPhone(){return phoneWidth()<=767;}function cleanMobileDetails(){if(!isPhone())return;document.querySelectorAll("tr.hrim-issue-history-detail-row,tr.hrim-supervision-detail-row").forEach(function(detail){detail.remove();});document.querySelectorAll(".hrim-issue-history-main-row,.hrim-supervision-main-row").forEach(function(row){row.removeAttribute("data-history-detail");row.removeAttribute("data-detail-target");row.removeAttribute("data-detail");row.style.cursor="default";});}cleanMobileDetails();document.addEventListener("DOMContentLoaded",cleanMobileDetails);window.addEventListener("resize",cleanMobileDetails);if(window.visualViewport)window.visualViewport.addEventListener("resize",cleanMobileDetails);setTimeout(cleanMobileDetails,50);setTimeout(cleanMobileDetails,300);document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".hrim-issue-history-main-row").forEach(function(row){row.addEventListener("click",function(e){if(isPhone())return;if(e.target.closest("button,a,form,input,select,textarea"))return;var id=row.getAttribute("data-history-detail");var detail=document.getElementById(id);if(detail){if(row.nextSibling!==detail)row.parentNode.insertBefore(detail,row.nextSibling);detail.hidden=!detail.hidden;}});});});})();</script>';
+    }
+
     private function dashboard_issue_table($rows,$mode='pending',$exportable=false,$show_documents=false,$show_update_documents=false){
+        // Compact Dashboard issue layout. Full issue views keep the detailed layout below.
+        if(!$exportable && in_array($mode,['pending_assign','pending'],true)){
+            $show_assigned=($mode==='pending');
+            ob_start(); ?>
+            <div class="hrim-table-wrap"><table class="hrim-table hrim-dashboard-issue-table hrim-dashboard-issue-<?php echo esc_attr($mode); ?>"><thead><tr><th>Asset</th><th>Section</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Date</th><?php if($show_assigned): ?><th>Assigned To</th><?php endif; ?></tr></thead><tbody>
+            <?php if(!$rows): ?><tr><td colspan="<?php echo $show_assigned?6:5; ?>" class="hrim-empty">No issues found.</td></tr><?php endif; foreach($rows as $r): ?>
+            <tr><td><?php echo esc_html($r->room_no?:'—'); ?></td><td><?php echo esc_html($r->section_name?:'General'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title?:'—'); ?></strong></td><td data-label="Issue" class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if($show_assigned): ?><td><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></td><?php endif; ?></tr>
+            <?php endforeach; ?></tbody></table></div><?php return ob_get_clean();
+        }
+
         $single_property=$this->single_active_property();
         $is_resolved=($mode==='resolved');
         $show_assigned=($mode!=='pending_assign');
-        $show_due=($mode!=='pending_assign');
-        $show_status=false; // Dashboard summary tables do not need status.
+        $show_due=false; // Due Date is stored internally only; do not display in issue tables.
+        $show_status=false;
         ob_start(); ?>
-        <div class="hrim-table-wrap"><table class="hrim-table <?php echo $exportable?'hrim-exportable':''; ?>"><thead><tr><th>Sl.</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Floor</th><th>Room</th><th>Section</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><?php if($show_assigned): ?><th>Assigned To</th><?php endif; ?><?php if($show_due): ?><th><?php echo $is_resolved?'Resolved Date':'Due Date'; ?></th><?php endif; ?><?php if($show_status): ?><th>Status</th><?php endif; ?><?php if($show_documents): ?><th>Photo</th><?php endif; ?><?php if($show_update_documents): ?><th>Update Photo</th><?php endif; ?></tr></thead><tbody>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-dashboard-issue-table hrim-dashboard-issue-<?php echo esc_attr(is_string($mode)?$mode:'general'); ?> <?php echo $exportable?'hrim-exportable':''; ?>"><thead><tr><th>Asset</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Floor</th><th>Section</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><?php if($show_assigned): ?><th>Assigned To</th><?php endif; ?><?php if($show_due): ?><th><?php echo $is_resolved?'Resolved Date':'Due Date'; ?></th><?php endif; ?><?php if($show_status): ?><th>Status</th><?php endif; ?><?php if($show_documents): ?><th>Photo</th><?php endif; ?><?php if($show_update_documents): ?><th>Update Photo</th><?php endif; ?></tr></thead><tbody>
         <?php
-        $base_cols=7+(!$single_property?1:0)+($show_assigned?1:0)+($show_due?1:0)+($show_status?1:0);
+        $base_cols=5+(!$single_property?1:0)+($show_assigned?1:0)+($show_due?1:0)+($show_status?1:0);
         $extra_cols=($show_documents?1:0)+($show_update_documents?1:0);
         if(!$rows): ?><tr><td colspan="<?php echo $base_cols+$extra_cols; ?>" class="hrim-empty">No issues found.</td></tr><?php endif;
-        $sl=0;
         foreach($rows as $r):
             $original_docs=$show_documents?$this->original_issue_documents($r):[];
             $update_docs=$show_update_documents?$this->issue_update_documents($r->id):[];
-        ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><?php echo esc_html($r->room_no?:'—'); ?></td><td><?php echo esc_html($r->section_name?:'General'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title?:'—'); ?></strong></td><td class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><?php if($show_assigned): ?><td><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></td><?php endif; ?><?php if($show_due): ?><td><?php if($is_resolved){ echo $r->resolved_at?esc_html($this->ist_date('d/m/y',$r->resolved_at)):'—'; } else { echo $r->due_date?esc_html($this->ist_date('d/m/y',$r->due_date)):'—'; } ?></td><?php endif; ?><?php if($show_status): ?><td><span class="hrim-badge <?php echo esc_attr($r->status==='resolved'||$r->status==='verified'||$r->status==='closed'?'success':''); ?>"><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></span></td><?php endif; ?><?php if($show_documents): ?><td data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><?php endif; ?><?php if($show_update_documents): ?><td data-export-value="<?php echo $update_docs?'Yes':'No'; ?>"><?php echo $this->document_button($update_docs); ?></td><?php endif; ?></tr><?php endforeach; ?>
-        </tbody></table></div><?php return ob_get_clean();
+            $history_expand=($mode==='resolved');
+        ?><tr<?php if($history_expand): ?> class="hrim-issue-history-main-row" data-history-detail="hrimIssueHistory<?php echo esc_attr($r->id); ?>"<?php endif; ?>><td data-label="Asset"><?php echo esc_html($r->room_no?:'—'); ?></td><td data-label="Checkpoint" class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title?:'—'); ?></strong></td><td class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><td data-label="Floor"><?php echo esc_html($r->floor_name?:'—'); ?></td><td data-label="Section"><?php echo esc_html($r->section_name?:'General'); ?></td><td data-label="Date"><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><?php if($show_assigned): ?><td><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></td><?php endif; ?><?php if($show_due): ?><td><?php if($is_resolved){ echo $r->resolved_at?esc_html($this->ist_date('d/m/y',$r->resolved_at)):'—'; } else { echo $r->due_date?esc_html($this->ist_date('d/m/y',$r->due_date)):'—'; } ?></td><?php endif; ?><?php if($show_status): ?><td><span class="hrim-badge <?php echo esc_attr($r->status==='resolved'||$r->status==='verified'||$r->status==='closed'?'success':''); ?>"><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></span></td><?php endif; ?><?php if($show_documents): ?><td data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><?php endif; ?><?php if($show_update_documents): ?><td data-export-value="<?php echo $update_docs?'Yes':'No'; ?>"><?php echo $this->document_button($update_docs); ?></td><?php endif; ?></tr><?php if($history_expand): ?><tr class="hrim-issue-history-detail-row" id="hrimIssueHistory<?php echo esc_attr($r->id); ?>" hidden><td colspan="<?php echo esc_attr($base_cols+$extra_cols); ?>"><?php echo $this->issue_history_tables($r->id); ?></td></tr><?php endif; ?><?php endforeach; ?>
+        </tbody></table></div><?php if($mode==='resolved') echo $this->issue_history_toggle_script(); return ob_get_clean();
     }
 
     private function issue_action_buttons($r){
         ob_start(); ?><div class="hrim-actions">
-          <button type="button" class="hrim-icon-btn hrim-action-assign hrim-assign-issue" data-id="<?php echo esc_attr($r->id); ?>" data-assigned="<?php echo esc_attr($r->assigned_to); ?>" data-due="<?php echo esc_attr($r->due_date); ?>" title="Assign Issue"><span class="dashicons dashicons-admin-users"></span></button>
-          <button type="button" class="hrim-icon-btn hrim-action-edit hrim-edit-issue" data-id="<?php echo esc_attr($r->id); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-description="<?php echo esc_attr($r->description); ?>" data-due="<?php echo esc_attr($r->due_date); ?>" title="Edit Issue"><span class="dashicons dashicons-edit"></span></button>
+          <button type="button" class="hrim-icon-btn hrim-action-edit hrim-edit-issue" data-id="<?php echo esc_attr($r->id); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-description="<?php echo esc_attr($r->description); ?>" title="Edit Issue"><span class="dashicons dashicons-edit"></span></button>
           <button type="button" class="hrim-icon-btn hrim-action-progress hrim-progress-issue" data-id="<?php echo esc_attr($r->id); ?>" data-status="<?php echo esc_attr($r->status); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-issue="<?php echo esc_attr($r->description); ?>" data-location="<?php echo esc_attr(trim(($this->single_active_property()?'':(($r->hotel_name?:'').' / ')).($r->floor_name?:'').' / '.($r->room_no?:''),' /')); ?>" data-resolution="<?php echo esc_attr($r->resolution_remarks); ?>" title="Update Progress"><span class="dashicons dashicons-yes-alt"></span></button>
           <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this issue?');"><input type="hidden" name="action" value="hrim_delete_issue"><input type="hidden" name="id" value="<?php echo esc_attr($r->id); ?>"><?php wp_nonce_field('hrim_delete_issue'); ?><button class="hrim-icon-btn hrim-action-delete hrim-delete" title="Delete"><span class="dashicons dashicons-trash"></span></button></form>
         </div><?php return ob_get_clean();
@@ -2307,28 +3121,27 @@ class HRIM_Core {
         global $wpdb;
         $floor_id=absint($_GET['floor_id']??0);
         $room_id=absint($_GET['room_id']??0);
-        $section_id=absint($_GET['section_id']??0);
+        $department_id=absint($_GET['department_id']??0);
         $floors=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_floors WHERE status='active' ORDER BY sort_order,name");
         $room_sql="SELECT id,floor_id,room_no FROM {$wpdb->prefix}hrim_rooms WHERE status='active'";
         if($floor_id) $room_sql.=$wpdb->prepare(' AND floor_id=%d',$floor_id);
         $room_sql.=' ORDER BY room_no';
         $rooms=$wpdb->get_results($room_sql);
         $departments=$this->active_departments();
-        $sections=$wpdb->get_results("SELECT id,name,department_id FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
-        return compact('floor_id','room_id','section_id','floors','rooms','sections');
+        return compact('floor_id','room_id','department_id','floors','rooms','departments');
     }
 
     private function apply_issue_location_filters(&$where,&$args,$filters){
         if(!empty($filters['floor_id'])){ $where.=' AND COALESCE(x.floor_id,r.floor_id)=%d'; $args[]=$filters['floor_id']; }
         if(!empty($filters['room_id'])){ $where.=' AND COALESCE(NULLIF(x.room_id,0),i.room_id)=%d'; $args[]=$filters['room_id']; }
-        if(!empty($filters['section_id'])){ $where.=' AND x.section_id=%d'; $args[]=$filters['section_id']; }
+        if(!empty($filters['department_id'])){ $where.=' AND x.department_id=%d'; $args[]=$filters['department_id']; }
     }
 
     private function issue_filter_selects($filters){
         ob_start(); ?>
         <label>Floor<select name="floor_id"><option value="">All Floors</option><?php foreach($filters['floors'] as $floor): ?><option value="<?php echo esc_attr($floor->id); ?>" <?php selected($filters['floor_id'],$floor->id); ?>><?php echo esc_html($floor->name); ?></option><?php endforeach; ?></select></label>
-        <label>Room<select name="room_id"><option value="">All Rooms</option><?php foreach($filters['rooms'] as $room): ?><option value="<?php echo esc_attr($room->id); ?>" <?php selected($filters['room_id'],$room->id); ?>><?php echo esc_html($room->room_no); ?></option><?php endforeach; ?></select></label>
-        <label>Section<select name="section_id"><option value="">All Sections</option><?php foreach($filters['sections'] as $section): ?><option value="<?php echo esc_attr($section->id); ?>" <?php selected($filters['section_id'],$section->id); ?>><?php echo esc_html($section->name); ?></option><?php endforeach; ?></select></label>
+        <label>Asset<select name="room_id"><option value="">All Assets</option><?php foreach($filters['rooms'] as $room): ?><option value="<?php echo esc_attr($room->id); ?>" <?php selected($filters['room_id'],$room->id); ?>><?php echo esc_html($room->room_no); ?></option><?php endforeach; ?></select></label>
+        <label>Department<select name="department_id"><option value="">All Departments</option><?php foreach($filters['departments'] as $department): ?><option value="<?php echo esc_attr($department->id); ?>" <?php selected($filters['department_id'],$department->id); ?>><?php echo esc_html($department->name); ?></option><?php endforeach; ?></select></label>
         <?php return ob_get_clean();
     }
 
@@ -2343,52 +3156,263 @@ class HRIM_Core {
         $single_property=$this->single_active_property();
         $users=$this->active_app_users(['administrator','hrim_owner','hrim_manager','hrim_supervisor','hrim_worker','hrim_inspector','hrim_housekeeping']);
         ob_start(); ?>
-        <div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><?php if(!empty($_GET['delayed'])): ?><input type="hidden" name="delayed" value="1"><?php endif; ?><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url(!empty($_GET['delayed'])?add_query_arg('delayed','1',$this->page_url('hotel-inspection-pending-issues')):$this->page_url($active==='pending_assign'?'hotel-inspection-pending-assign-issues':'hotel-inspection-pending-issues')); ?>">Clear</a><?php echo $this->excel_button(sanitize_title($title)); ?></form></div>
-        <div class="hrim-panel"><div class="hrim-panel-head"><div><small><?php echo count($rows); ?> issues</small></div></div>
-        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Floor</th><th>Room</th><th>Section</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><?php if($active!=='pending_assign'): ?><th>Assigned To</th><th>Due Date</th><?php if($active!=='pending_issues'): ?><th>Status</th><?php endif; ?><?php endif; ?><th>Photo</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
-        <?php if(!$rows): ?><tr><td colspan="<?php echo $active==='pending_assign'?($single_property?9:10):($active==='pending_issues'?($single_property?11:12):($single_property?12:13)); ?>" class="hrim-empty"><?php echo esc_html($empty); ?></td></tr><?php endif; ?>
-        <?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><?php echo esc_html($r->room_no?:'—'); ?></td><td><?php echo esc_html($r->section_name?:'General'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title?:'—'); ?></strong></td><td class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><?php if($active!=='pending_assign'): ?><td><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></td><td><?php echo $r->due_date?esc_html($this->ist_date('d/m/y',$r->due_date)):'—'; ?></td><?php if($active!=='pending_issues'): ?><td><span class="hrim-badge"><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></span></td><?php endif; ?><?php endif; ?><?php $original_docs=$this->original_issue_documents($r); ?><td data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><td class="hrim-no-export"><?php
+        <div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><?php if(!empty($_GET['delayed'])): ?><input type="hidden" name="delayed" value="1"><?php endif; ?><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php $clear_slug=$active==='pending_assign'?'hotel-inspection-pending-assign-issues':($active==='pending_supervision'?'hotel-inspection-pending-supervision':'hotel-inspection-pending-issues'); echo esc_url(!empty($_GET['delayed'])?add_query_arg('delayed','1',$this->page_url('hotel-inspection-pending-issues')):$this->page_url($clear_slug)); ?>">Clear</a><?php echo $this->excel_button(sanitize_title($title)); ?></form></div>
+        <div class="hrim-panel hrim-issue-results-panel"><div class="hrim-panel-head hrim-results-panel-head hrim-issue-results-head"><div><small><?php echo count($rows); ?> issues</small></div><div class="hrim-toolbar hrim-panel-head-actions hrim-issue-head-actions"></div></div>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable <?php echo $active==='pending_issues'?'hrim-mobile-card-table hrim-pending-issues-table':''; ?>"><thead><tr><th>Asset</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Floor</th><th>Section</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><?php if($active!=='pending_assign'): ?><th>Assigned To</th><?php if($active!=='pending_issues'): ?><th>Status</th><?php endif; ?><?php endif; ?><th>Photo</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
+        <?php if(!$rows): ?><tr><td colspan="<?php echo $active==='pending_assign'?($single_property?8:9):($active==='pending_issues'?($single_property?9:10):($single_property?10:11)); ?>" class="hrim-empty"><?php echo esc_html($empty); ?></td></tr><?php endif; ?>
+        <?php foreach($rows as $r): $detail_cols=$active==='pending_assign'?($single_property?8:9):($active==='pending_issues'?($single_property?9:10):($single_property?10:11)); $show_history_detail=$active!=='pending_issues'; ?><tr<?php if($show_history_detail): ?> class="hrim-issue-history-main-row" data-history-detail="hrimIssueHistory<?php echo esc_attr($r->id); ?>"<?php endif; ?>><td><?php echo esc_html($r->room_no?:'—'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title?:'—'); ?></strong></td><td class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><?php echo esc_html($r->section_name?:'General'); ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td data-label="Hotel"><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><?php if($active!=='pending_assign'): ?><td data-label="Assigned To"><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></td><?php if($active!=='pending_issues'): ?><td><span class="hrim-badge"><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></span></td><?php endif; ?><?php endif; ?><?php $original_docs=$this->original_issue_documents($r); ?><td data-label="Photo" data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><td data-label="Actions" class="hrim-no-export"><?php
             if($active==='pending_assign'){
-                ?><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-assign hrim-assign-issue" data-id="<?php echo esc_attr($r->id); ?>" data-assigned="<?php echo esc_attr($r->assigned_to); ?>" data-due="<?php echo esc_attr($r->due_date); ?>" title="Assign Issue"><span class="dashicons dashicons-admin-users"></span></button></div><?php
+                ?><div class="hrim-actions"></div><?php
             } elseif($active==='pending_issues'){
                 ?><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-progress hrim-progress-issue" data-id="<?php echo esc_attr($r->id); ?>" data-status="<?php echo esc_attr($r->status); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-issue="<?php echo esc_attr($r->description); ?>" data-location="<?php echo esc_attr(trim(($this->single_active_property()?'':(($r->hotel_name?:'').' / ')).($r->floor_name?:'').' / '.($r->room_no?:''),' /')); ?>" data-resolution="<?php echo esc_attr($r->resolution_remarks); ?>" title="Update Progress"><span class="dashicons dashicons-yes-alt"></span></button></div><?php
             } else {
                 echo $this->issue_action_buttons($r);
             }
-        ?></td></tr><?php endforeach; ?>
-        </tbody></table></div></div>
+        ?></td></tr><?php if($show_history_detail): ?><tr class="hrim-issue-history-detail-row" id="hrimIssueHistory<?php echo esc_attr($r->id); ?>" hidden><td colspan="<?php echo esc_attr($detail_cols); ?>"><?php echo $this->issue_history_tables($r->id); ?></td></tr><?php endif; ?><?php endforeach; ?>
+        </tbody></table></div>
+        <?php if($active==='pending_issues'): ?>
+        <div class="hrim-dedicated-mobile-cards hrim-unresolved-mobile-cards" aria-label="Unresolved issue cards">
+          <?php if(!$rows): ?><div class="hrim-mobile-issue-empty"><?php echo esc_html($empty); ?></div><?php endif; ?>
+          <?php foreach($rows as $r): $original_docs=$this->original_issue_documents($r); ?>
+          <article class="hrim-mobile-issue-card" data-search="<?php echo esc_attr(strtolower(trim(implode(' ',[(string)$r->room_no,(string)$r->asset_type_name,(string)$r->title,(string)$r->description,(string)$r->floor_name,(string)$r->section_name,(string)$r->assigned_name])))); ?>">
+            <div class="hrim-mobile-issue-card-head hrim-unresolved-card-head">
+              <div class="hrim-mobile-issue-title">
+                <div class="hrim-mobile-issue-heading-block">
+                  <span class="hrim-mobile-asset-line"><?php echo esc_html(trim(($r->room_no?:'—').(!empty($r->floor_name)?' - '.$r->floor_name:''))); ?></span>
+                  <strong><?php
+                    $checkpoint_text=trim((string)($r->title??''))!==''?$r->title:'—';
+                    $issue_text=trim((string)($r->description??''));
+                    echo esc_html($checkpoint_text);
+                    if($issue_text!==''){
+                        echo ' <span class="hrim-mobile-issue-inline">('.esc_html($issue_text).')</span>';
+                    }
+                  ?></strong>
+                </div>
+                
+              </div>
+            </div>
+            <div class="hrim-mobile-issue-grid hrim-unresolved-detail-grid">
+              <div class="hrim-mobile-label-value"><span>Department</span><strong><?php echo esc_html($r->department_name?:'—'); ?></strong></div>
+              <div class="hrim-mobile-label-value"><span>Issue Date</span><strong><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></strong></div>
+              <div class="hrim-mobile-label-value"><span>Assigned To</span><strong><?php echo esc_html($r->assigned_name?:'Unassigned'); ?></strong></div>
+            </div>
+            <div class="hrim-mobile-issue-card-foot <?php echo $original_docs?'':'hrim-no-photo'; ?>">
+              <?php if($original_docs): ?><div class="hrim-mobile-photo-action"><?php echo $this->document_button($original_docs); ?></div><?php endif; ?>
+              <button type="button" class="hrim-primary hrim-mobile-update-btn hrim-progress-issue" data-id="<?php echo esc_attr($r->id); ?>" data-status="<?php echo esc_attr($r->status); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-issue="<?php echo esc_attr($r->description); ?>" data-location="<?php echo esc_attr(trim(($this->single_active_property()?'':(($r->hotel_name?:'').' / ')).($r->floor_name?:'').' / '.($r->room_no?:''),' /')); ?>" data-resolution="<?php echo esc_attr($r->resolution_remarks); ?>">Update</button>
+            </div>
+          </article>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        </div>
         <?php
         if($active==='pending_assign'){
             echo $this->assign_issue_modal($users);
         } elseif($active==='pending_issues'){
             echo $this->progress_issue_modal();
         } else {
-            echo $this->assign_issue_modal($users); echo $this->edit_issue_modal(); echo $this->progress_issue_modal();
+            echo $this->edit_issue_modal(); echo $this->progress_issue_modal();
         }
         echo $this->issue_documents_modal();
+        echo $this->issue_history_toggle_script();
         return $this->shell($title,ob_get_clean(),$active);
     }
 
     public function pending_assign_issues_shortcode(){
-        return $this->filtered_issue_view('Pending Assign Issue','pending_assign',"(x.assigned_to IS NULL OR x.assigned_to=0) AND x.status IN ('open','reopened')");
+        return $this->filtered_issue_view('Unassigned Issues','pending_assign',"(x.assigned_to IS NULL OR x.assigned_to=0) AND x.status IN ('open','reopened')");
     }
     public function pending_issues_shortcode(){
         if(!empty($_GET['delayed'])){
             $today_ist=$this->ist_date('Y-m-d');
             return $this->filtered_issue_view('Delayed Issues','pending_issues',"x.status NOT IN ('resolved','verified','closed') AND x.due_date IS NOT NULL AND x.due_date<>'' AND DATE(x.due_date)<%s",[$today_ist]);
         }
-        return $this->filtered_issue_view('Pending Issues','pending_issues',"x.assigned_to IS NOT NULL AND x.assigned_to>0 AND x.status IN ('assigned','in_progress','reopened','open')");
+        return $this->filtered_issue_view('Unresolved Issues','pending_issues',"x.assigned_to IS NOT NULL AND x.assigned_to>0 AND x.status IN ('assigned','in_progress','reopened','open')");
     }
+    public function pending_supervision_shortcode(){
+        if(!$this->can_issues()&&!$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','pending_supervision');
+        global $wpdb;
+        [$from,$to]=$this->filter_dates();
+        $issue_filters=$this->issue_filter_context();
+        $where="x.status='resolved'"; $args=[];
+        if($from){ $where.=' AND DATE(COALESCE(x.resolved_at,x.created_at))>=%s'; $args[]=$from; }
+        if($to){ $where.=' AND DATE(COALESCE(x.resolved_at,x.created_at))<=%s'; $args[]=$to; }
+        $this->apply_issue_location_filters($where,$args,$issue_filters);
+        $rows=$this->get_issue_rows($where,$args,0);
+        $current_user=wp_get_current_user();
+        $today=$this->ist_date('Y-m-d');
+        ob_start(); ?>
+        <div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url($this->page_url('hotel-inspection-pending-supervision')); ?>">Clear</a><?php echo $this->excel_button('pending-supervision'); ?></form></div>
+        <div class="hrim-panel hrim-issue-results-panel"><div class="hrim-panel-head hrim-results-panel-head hrim-issue-results-head"><div><small><?php echo count($rows); ?> issues</small></div></div>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable hrim-supervision-table hrim-mobile-card-table"><thead><tr><th>Floor</th><th>Asset</th><th>Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Update Date</th><th>Update Remarks</th><th>Photo</th><th>Update Photo</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
+        <?php if(!$rows): ?><tr><td colspan="9" class="hrim-empty">No issues pending supervision.</td></tr><?php endif; ?>
+        <?php foreach($rows as $r):
+            $original_docs=$this->original_issue_documents($r);
+            $update_docs=$this->issue_update_documents($r->id);
+            $latest_update=$wpdb->get_row($wpdb->prepare("SELECT u.*,usr.display_name updated_name FROM {$wpdb->prefix}hrim_issue_updates u LEFT JOIN {$wpdb->users} usr ON usr.ID=u.updated_by WHERE u.issue_id=%d AND u.update_type='progress' AND u.status='resolved' ORDER BY u.update_date DESC,u.id DESC LIMIT 1",$r->id));
+            $update_date=$latest_update&&$latest_update->update_date?$latest_update->update_date:$r->resolved_at;
+        ?>
+        <tr class="hrim-supervision-main-row" data-detail="hrimSupervisionDetail<?php echo esc_attr($r->id); ?>"><td data-label="Floor"><?php echo esc_html($r->floor_name?:'—'); ?></td><td data-label="Asset"><?php echo esc_html($r->room_no?:'—'); ?></td><td data-label="Checkpoint"><?php echo esc_html($r->title?:'—'); ?></td><td data-label="Issue" class="hrim-col-issue"><?php echo trim((string)$r->description)!==''?nl2br(esc_html($r->description)):'<span class="hrim-muted">—</span>'; ?></td><td data-label="Update Date"><?php echo $update_date?esc_html($this->ist_date('d/m/y',$update_date)):'—'; ?></td><td data-label="Update Remarks"><?php echo $latest_update&&trim((string)$latest_update->remarks)!==''?nl2br(esc_html($latest_update->remarks)):'—'; ?></td><td data-label="Photo" data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><td data-label="Update Photo" data-export-value="<?php echo $update_docs?'Yes':'No'; ?>"><?php echo $this->document_button($update_docs); ?></td><td data-label="Actions" class="hrim-no-export"><button type="button" class="hrim-primary hrim-supervision-update-btn" data-modal="hrimSupervisionModal<?php echo esc_attr($r->id); ?>">Update</button></td></tr>
+        <tr class="hrim-supervision-detail-row" id="hrimSupervisionDetail<?php echo esc_attr($r->id); ?>" hidden><td colspan="9"><?php echo $this->issue_history_tables($r->id); ?></td></tr>
+        <?php endforeach; ?>
+        </tbody></table></div>
+        <div class="hrim-dedicated-mobile-cards hrim-supervision-mobile-cards" aria-label="Pending supervision cards">
+          <?php if(!$rows): ?><div class="hrim-mobile-issue-empty">No issues pending supervision.</div><?php endif; ?>
+          <?php foreach($rows as $r):
+            $original_docs=$this->original_issue_documents($r);
+            $update_docs=$this->issue_update_documents($r->id);
+            $latest_update=$wpdb->get_row($wpdb->prepare("SELECT u.*,usr.display_name updated_name FROM {$wpdb->prefix}hrim_issue_updates u LEFT JOIN {$wpdb->users} usr ON usr.ID=u.updated_by WHERE u.issue_id=%d AND u.update_type='progress' AND u.status='resolved' ORDER BY u.update_date DESC,u.id DESC LIMIT 1",$r->id));
+            $update_date=$latest_update&&$latest_update->update_date?$latest_update->update_date:$r->resolved_at;
+          ?>
+          <article class="hrim-mobile-issue-card hrim-mobile-supervision-card" data-search="<?php echo esc_attr(strtolower(trim(implode(' ',[(string)$r->room_no,(string)$r->title,(string)$r->description,(string)$r->floor_name,(string)$r->section_name,(string)$r->department_name,(string)($latest_update->updated_name??''),(string)($latest_update->remarks??'')])))); ?>">
+            <div class="hrim-mobile-issue-card-head hrim-supervision-card-head">
+              <div class="hrim-mobile-issue-title">
+                <div class="hrim-mobile-issue-heading-block">
+                  <span class="hrim-mobile-asset-line"><?php echo esc_html(trim(($r->room_no?:'—').(!empty($r->floor_name)?' - '.$r->floor_name:''))); ?></span>
+                  <strong><?php
+                    $checkpoint_text=trim((string)($r->title??''))!==''?$r->title:'—';
+                    $issue_text=trim((string)($r->description??''));
+                    echo esc_html($checkpoint_text);
+                    if($issue_text!==''){
+                        echo ' <span class="hrim-mobile-issue-inline">('.esc_html($issue_text).')</span>';
+                    }
+                  ?></strong>
+                </div>
+                
+              </div>
+            </div>
+            <div class="hrim-mobile-issue-grid hrim-supervision-detail-grid">
+              <div class="hrim-mobile-label-value"><span>Department</span><strong><?php echo esc_html($r->department_name?:'—'); ?></strong></div>
+              <div class="hrim-mobile-label-value"><span>Updated By</span><strong><?php echo esc_html($latest_update&&$latest_update->updated_name?$latest_update->updated_name:($r->assigned_name?:'—')); ?></strong></div>
+              <div class="hrim-mobile-label-value"><span>Update Date</span><strong><?php echo $update_date?esc_html($this->ist_date('d/m/y',$update_date)):'—'; ?></strong></div>
+              <div class="hrim-mobile-label-value"><span>Remarks</span><strong><?php echo $latest_update&&trim((string)$latest_update->remarks)!==''?nl2br(esc_html($latest_update->remarks)):'—'; ?></strong></div>
+            </div>
+            <div class="hrim-mobile-issue-card-foot <?php echo ($original_docs||$update_docs)?'':'hrim-no-photo'; ?>">
+              <?php if($original_docs||$update_docs): ?><div class="hrim-mobile-photo-pair"><?php if($original_docs): ?><span><?php echo $this->document_button($original_docs); ?></span><?php endif; ?><?php if($update_docs): ?><span><?php echo $this->document_button($update_docs); ?></span><?php endif; ?></div><?php endif; ?>
+              <button type="button" class="hrim-primary hrim-supervision-update-btn hrim-mobile-update-btn" data-modal="hrimSupervisionModal<?php echo esc_attr($r->id); ?>">Supervise</button>
+            </div>
+          </article>
+          <?php endforeach; ?>
+        </div>
+        </div>
+
+        <?php /* v3.19.95: actual Pending Supervision modals, outside the table/panel. */ ?>
+        <div class="hrim-supervision-modals">
+          <?php foreach($rows as $r): ?>
+            <div class="hrim-modal hrim-supervision-modal" id="hrimSupervisionModal<?php echo esc_attr($r->id); ?>" aria-hidden="true">
+              <div class="hrim-modal-card">
+                <div class="hrim-supervision-modal-head">
+                  <h2>Update Supervision</h2>
+                  <button type="button" class="hrim-modal-close hrim-supervision-close" aria-label="Close supervision form">×</button>
+                </div>
+                <form class="hrim-form hrim-supervision-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                  <input type="hidden" name="action" value="hrim_save_issue_supervision">
+                  <input type="hidden" name="issue_id" value="<?php echo esc_attr($r->id); ?>">
+                  <?php wp_nonce_field('hrim_save_issue_supervision'); ?>
+
+                  <div class="hrim-supervision-field hrim-supervision-full">
+                    <label for="hrimSupervisionDate<?php echo esc_attr($r->id); ?>">Supervision Date <em>*</em></label>
+                    <input id="hrimSupervisionDate<?php echo esc_attr($r->id); ?>" type="date" name="supervision_date" value="<?php echo esc_attr($today); ?>" required>
+                  </div>
+
+                  <div class="hrim-supervision-field hrim-supervision-full">
+                    <label for="hrimSupervisionRemarks<?php echo esc_attr($r->id); ?>">Supervision Remarks <em>*</em></label>
+                    <textarea id="hrimSupervisionRemarks<?php echo esc_attr($r->id); ?>" name="supervision_remarks" rows="4" placeholder="Enter supervision remarks" required></textarea>
+                  </div>
+
+                  <div class="hrim-supervision-field hrim-supervision-full">
+                    <label>Are you satisfied with the Work? <em>*</em></label>
+                    <div class="hrim-supervision-choice-group" role="radiogroup" aria-label="Are you satisfied with the Work?">
+                      <label class="hrim-supervision-choice hrim-supervision-choice-yes" for="hrimSupervisionSatisfiedYes<?php echo esc_attr($r->id); ?>">
+                        <input id="hrimSupervisionSatisfiedYes<?php echo esc_attr($r->id); ?>" type="radio" name="satisfied" value="yes" required>
+                        <span class="dashicons dashicons-yes-alt" aria-hidden="true"></span><strong>Yes</strong>
+                      </label>
+                      <label class="hrim-supervision-choice hrim-supervision-choice-no" for="hrimSupervisionSatisfiedNo<?php echo esc_attr($r->id); ?>">
+                        <input id="hrimSupervisionSatisfiedNo<?php echo esc_attr($r->id); ?>" type="radio" name="satisfied" value="no" required>
+                        <span class="dashicons dashicons-dismiss" aria-hidden="true"></span><strong>No</strong>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="hrim-form-actions">
+                    <button class="hrim-primary" type="submit">Update Supervision</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+
+        <?php echo $this->issue_documents_modal(); ?>
+        <script>
+        /* v3.19.95: delegated supervision modal controls for desktop + dedicated mobile cards. */
+        (function(){
+          function openSupervisionModal(btn){
+            var id=btn&&btn.getAttribute('data-modal');
+            if(!id)return;
+            var m=document.getElementById(id);
+            if(!m)return;
+            m.classList.add('open');
+            m.setAttribute('aria-hidden','false');
+            document.documentElement.classList.add('hrim-modal-open');
+          }
+          document.addEventListener('click',function(e){
+            var btn=e.target.closest('.hrim-supervision-update-btn');
+            if(btn){ e.preventDefault(); e.stopPropagation(); openSupervisionModal(btn); return; }
+            var close=e.target.closest('.hrim-supervision-close');
+            if(close){
+              var m=close.closest('.hrim-modal');
+              if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');}
+              document.documentElement.classList.remove('hrim-modal-open');
+              return;
+            }
+            if(e.target.classList && e.target.classList.contains('hrim-supervision-modal')){
+              e.target.classList.remove('open');
+              e.target.setAttribute('aria-hidden','true');
+              document.documentElement.classList.remove('hrim-modal-open');
+            }
+          },false);
+        })();
+        document.addEventListener('DOMContentLoaded',function(){
+          function hrimPhoneWidth(){var v=[];if(window.visualViewport&&window.visualViewport.width)v.push(window.visualViewport.width);if(window.innerWidth)v.push(window.innerWidth);if(document.documentElement&&document.documentElement.clientWidth)v.push(document.documentElement.clientWidth);if(window.screen&&window.screen.width)v.push(window.screen.width);return v.length?Math.min.apply(Math,v):9999;}
+          var mobileScreen=hrimPhoneWidth()<=767;
+          function removeMobileSupervisionDetails(){if(hrimPhoneWidth()>767)return;document.querySelectorAll('.hrim-supervision-detail-row').forEach(function(detail){detail.remove();});document.querySelectorAll('.hrim-supervision-main-row').forEach(function(row){row.removeAttribute('data-detail');row.style.cursor='default';});}
+          removeMobileSupervisionDetails();
+          setTimeout(removeMobileSupervisionDetails,50);
+          setTimeout(removeMobileSupervisionDetails,300);
+          if(window.visualViewport)window.visualViewport.addEventListener('resize',removeMobileSupervisionDetails);
+          document.querySelectorAll('.hrim-supervision-main-row').forEach(function(row){
+            row.addEventListener('click',function(e){ if(mobileScreen) return; if(e.target.closest('button,a,form,input,select,textarea')) return; var id=row.getAttribute('data-detail'); var detail=document.getElementById(id); if(detail){ if(row.nextSibling!==detail) row.parentNode.insertBefore(detail,row.nextSibling); detail.hidden=!detail.hidden; } });
+          });
+
+          document.querySelectorAll('.hrim-supervision-choice input[type=radio]').forEach(function(input){input.addEventListener('change',function(){var group=input.closest('.hrim-supervision-choice-group');if(!group)return;group.querySelectorAll('.hrim-supervision-choice').forEach(function(label){label.classList.remove('is-selected');});var label=input.closest('.hrim-supervision-choice');if(label)label.classList.add('is-selected');});});
+        });
+        </script>
+        <?php return $this->shell('Pending Supervision',ob_get_clean(),'pending_supervision');
+    }
+
     public function resolved_issues_shortcode(){
         [$from,$to]=$this->filter_dates();
         $issue_filters=$this->issue_filter_context();
-        $where="x.status IN ('resolved','verified','closed')"; $args=[];
+        $where="x.status IN ('verified','closed')"; $args=[];
         if($from){$where.=" AND DATE(COALESCE(x.resolved_at,x.created_at))>=%s";$args[]=$from;}
         if($to){$where.=" AND DATE(COALESCE(x.resolved_at,x.created_at))<=%s";$args[]=$to;}
         $this->apply_issue_location_filters($where,$args,$issue_filters);
         if(!$this->can_issues()&&!$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','resolved_issues');
         $rows=$this->get_issue_rows($where,$args,0);
-        ob_start(); ?><div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url($this->page_url('hotel-inspection-resolved-issues')); ?>">Clear</a><?php echo $this->excel_button('issue-resolved'); ?></form></div><div class="hrim-panel"><div class="hrim-panel-head"><div><small><?php echo count($rows); ?> issues</small></div></div><?php echo $this->dashboard_issue_table($rows,true,true,true,true); ?></div><?php echo $this->issue_documents_modal(); return $this->shell('Issue Resolved',ob_get_clean(),'resolved_issues');
+        ob_start(); ?><div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url($this->page_url('hotel-inspection-resolved-issues')); ?>">Clear</a><?php echo $this->excel_button('issue-resolved'); ?></form></div><div class="hrim-panel hrim-issue-results-panel"><div class="hrim-panel-head hrim-results-panel-head hrim-issue-results-head"><div><small><?php echo count($rows); ?> issues</small></div><div class="hrim-toolbar hrim-panel-head-actions hrim-issue-head-actions"></div></div><?php echo $this->dashboard_issue_table($rows,'resolved',true,true,true); ?></div><?php echo $this->issue_documents_modal(); return $this->shell('Issue Resolved',ob_get_clean(),'resolved_issues');
+    }
+
+    public function add_issue_shortcode(){
+        if(!$this->can_issues()&&!$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','add_issue');
+        global $wpdb;
+        $hotels=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_hotels WHERE status='active' ORDER BY name");
+        $floors=$wpdb->get_results("SELECT id,hotel_id,name FROM {$wpdb->prefix}hrim_floors WHERE status='active' ORDER BY sort_order,name");
+        $rooms=$wpdb->get_results("SELECT id,hotel_id,floor_id,room_no FROM {$wpdb->prefix}hrim_rooms WHERE status='active' ORDER BY room_no");
+        $sections=$wpdb->get_results("SELECT id,name,department_id FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
+        $departments=$wpdb->get_results("SELECT d.id,d.name,d.department_head_user_id,u.display_name department_head_name FROM {$wpdb->prefix}hrim_departments d LEFT JOIN {$wpdb->users} u ON u.ID=d.department_head_user_id WHERE d.status='active' ORDER BY d.name");
+        $users=$this->active_app_users(['administrator','hrim_manager','hrim_inspector','hrim_housekeeping']);
+        $content='<div class="hrim-add-issue-standalone">'.$this->add_issue_modal($hotels,$floors,$rooms,$departments,$sections,$users,true,true).'</div>';
+        return $this->shell('Add Issue',$content,'add_issue');
     }
 
     public function issues_shortcode(){
@@ -2402,14 +3426,14 @@ class HRIM_Core {
         $rooms=$wpdb->get_results("SELECT id,hotel_id,floor_id,room_no FROM {$wpdb->prefix}hrim_rooms WHERE status='active' ORDER BY room_no");
         $single_property=$this->single_active_property();
         $sections=$wpdb->get_results("SELECT id,name,department_id FROM {$wpdb->prefix}hrim_sections WHERE status='active' ORDER BY sort_order,name");
-        $departments=$wpdb->get_results("SELECT id,name FROM {$wpdb->prefix}hrim_departments WHERE status='active' ORDER BY name");
+        $departments=$wpdb->get_results("SELECT d.id,d.name,d.department_head_user_id,u.display_name department_head_name FROM {$wpdb->prefix}hrim_departments d LEFT JOIN {$wpdb->users} u ON u.ID=d.department_head_user_id WHERE d.status='active' ORDER BY d.name");
         $users=$this->active_app_users(['administrator','hrim_manager','hrim_inspector','hrim_housekeeping']);
         ob_start(); ?>
-        <div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><?php if($open_only): ?><input type="hidden" name="open_only" value="1"><?php endif; ?><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url($this->page_url('hotel-inspection-issues')); ?>">Clear</a><?php echo $this->excel_button('issues'); ?></form></div><div class="hrim-panel"><div class="hrim-panel-head"><div><small><?php echo count($rows); ?> issues</small></div><div class="hrim-toolbar"><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add_issue','1',$this->page_url('hotel-inspection-issues'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Issue</a></div></div>
-        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Floor</th><th>Room</th><th>Section</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Assigned To</th><th>Due Date</th><th>Status</th><th>Photo</th><th>Update Photo</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
-        <?php if(!$rows): ?><tr><td colspan="<?php echo $single_property?13:14; ?>" class="hrim-empty">No issues found.</td></tr><?php endif; ?>
-        <?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><?php echo esc_html($r->room_no?:'—'); ?></td><td><?php echo esc_html($r->section_name ?: 'General'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title); ?></strong></td><td class="hrim-col-issue"><?php echo $r->description !== '' && $r->description !== null ? nl2br(esc_html($r->description)) : '<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->assigned_name ?: 'Unassigned'); ?></td><td><?php echo $r->due_date ? esc_html($this->ist_date('d/m/y',$r->due_date)) : '—'; ?></td><td><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></td><?php $original_docs=$this->original_issue_documents($r); $update_docs=$this->issue_update_documents($r->id); ?><td data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><td data-export-value="<?php echo $update_docs?'Yes':'No'; ?>"><?php echo $this->document_button($update_docs); ?></td><td class="hrim-no-export"><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-assign hrim-assign-issue" data-id="<?php echo esc_attr($r->id); ?>" data-assigned="<?php echo esc_attr($r->assigned_to); ?>" data-due="<?php echo esc_attr($r->due_date); ?>" title="Assign Issue"><span class="dashicons dashicons-admin-users"></span></button><button type="button" class="hrim-icon-btn hrim-action-edit hrim-edit-issue" data-id="<?php echo esc_attr($r->id); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-description="<?php echo esc_attr($r->description); ?>" data-due="<?php echo esc_attr($r->due_date); ?>" title="Edit Issue"><span class="dashicons dashicons-edit"></span></button><button type="button" class="hrim-icon-btn hrim-action-progress hrim-progress-issue" data-id="<?php echo esc_attr($r->id); ?>" data-status="<?php echo esc_attr($r->status); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-issue="<?php echo esc_attr($r->description); ?>" data-location="<?php echo esc_attr(trim(($this->single_active_property()?'':(($r->hotel_name?:'').' / ')).($r->floor_name?:'').' / '.($r->room_no?:''),' /')); ?>" data-resolution="<?php echo esc_attr($r->resolution_remarks); ?>" title="Update Progress"><span class="dashicons dashicons-yes-alt"></span></button><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this issue?');"><input type="hidden" name="action" value="hrim_delete_issue"><input type="hidden" name="id" value="<?php echo esc_attr($r->id); ?>"><?php wp_nonce_field('hrim_delete_issue'); ?><button class="hrim-icon-btn hrim-action-delete hrim-delete" title="Delete"><span class="dashicons dashicons-trash"></span></button></form></div></td></tr><?php endforeach; ?></tbody></table></div></div>
-        <?php echo $this->add_issue_modal($hotels,$floors,$rooms,$departments,$sections,$users,$show_add_issue); echo $this->assign_issue_modal($users); echo $this->edit_issue_modal(); echo $this->progress_issue_modal(); echo $this->issue_documents_modal(); return $this->shell('Issue Management',ob_get_clean(),'issues');
+        <div class="hrim-panel hrim-no-print"><form class="hrim-filter" method="get"><?php if($open_only): ?><input type="hidden" name="open_only" value="1"><?php endif; ?><label>From Date<input type="date" name="from" value="<?php echo esc_attr($from); ?>"></label><label>To Date<input type="date" name="to" value="<?php echo esc_attr($to); ?>"></label><?php echo $this->issue_filter_selects($issue_filters); ?><label>Search<input type="search" class="hrim-table-search" placeholder=""></label><a class="hrim-secondary hrim-clear-filter" href="<?php echo esc_url($this->page_url('hotel-inspection-issues')); ?>">Clear</a><?php echo $this->excel_button('issues'); ?></form></div><div class="hrim-panel hrim-issue-results-panel"><div class="hrim-panel-head hrim-results-panel-head hrim-issue-results-head"><div><small><?php echo count($rows); ?> issues</small></div><div class="hrim-toolbar hrim-panel-head-actions hrim-issue-head-actions"><a class="hrim-primary hrim-issue-add-button" href="<?php echo esc_url(add_query_arg('add_issue','1',$this->page_url('hotel-inspection-issues'))); ?>" title="Add Issue" aria-label="Add Issue"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span><span class="hrim-button-label">Add Issue</span></a></div></div>
+        <div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Asset</th><th class="hrim-col-checkpoint">Checkpoint</th><th class="hrim-col-issue">Issue</th><th>Floor</th><th>Section</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Assigned To</th><th>Status</th><th>Photo</th><th>Update Photo</th><th class="hrim-no-export">Actions</th></tr></thead><tbody>
+        <?php if(!$rows): ?><tr><td colspan="<?php echo $single_property?11:12; ?>" class="hrim-empty">No issues found.</td></tr><?php endif; ?>
+        <?php foreach($rows as $r): $detail_cols=$single_property?11:12; ?><tr class="hrim-issue-history-main-row" data-history-detail="hrimIssueHistory<?php echo esc_attr($r->id); ?>"><td><?php echo esc_html($r->room_no?:'—'); ?></td><td class="hrim-col-checkpoint"><strong><?php echo esc_html($r->title); ?></strong></td><td class="hrim-col-issue"><?php echo $r->description !== '' && $r->description !== null ? nl2br(esc_html($r->description)) : '<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><?php echo esc_html($r->section_name ?: 'General'); ?></td><td><?php echo !empty($r->created_at)?esc_html($this->ist_date('d/m/y',$r->created_at)):'—'; ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name?:'—'); ?></td><?php endif; ?><td><?php echo esc_html($r->assigned_name ?: 'Unassigned'); ?></td><td><?php echo esc_html(ucwords(str_replace('_',' ',$r->status))); ?></td><?php $original_docs=$this->original_issue_documents($r); $update_docs=$this->issue_update_documents($r->id); ?><td data-export-value="<?php echo $original_docs?'Yes':'No'; ?>"><?php echo $this->document_button($original_docs); ?></td><td data-export-value="<?php echo $update_docs?'Yes':'No'; ?>"><?php echo $this->document_button($update_docs); ?></td><td class="hrim-no-export"><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-edit hrim-edit-issue" data-id="<?php echo esc_attr($r->id); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-description="<?php echo esc_attr($r->description); ?>" title="Edit Issue"><span class="dashicons dashicons-edit"></span></button><button type="button" class="hrim-icon-btn hrim-action-progress hrim-progress-issue" data-id="<?php echo esc_attr($r->id); ?>" data-status="<?php echo esc_attr($r->status); ?>" data-title="<?php echo esc_attr($r->title); ?>" data-issue="<?php echo esc_attr($r->description); ?>" data-location="<?php echo esc_attr(trim(($this->single_active_property()?'':(($r->hotel_name?:'').' / ')).($r->floor_name?:'').' / '.($r->room_no?:''),' /')); ?>" data-resolution="<?php echo esc_attr($r->resolution_remarks); ?>" title="Update Progress"><span class="dashicons dashicons-yes-alt"></span></button><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this issue?');"><input type="hidden" name="action" value="hrim_delete_issue"><input type="hidden" name="id" value="<?php echo esc_attr($r->id); ?>"><?php wp_nonce_field('hrim_delete_issue'); ?><button class="hrim-icon-btn hrim-action-delete hrim-delete" title="Delete"><span class="dashicons dashicons-trash"></span></button></form></div></td></tr><tr class="hrim-issue-history-detail-row" id="hrimIssueHistory<?php echo esc_attr($r->id); ?>" hidden><td colspan="<?php echo esc_attr($detail_cols); ?>"><?php echo $this->issue_history_tables($r->id); ?></td></tr><?php endforeach; ?></tbody></table></div></div>
+        <?php echo $this->add_issue_modal($hotels,$floors,$rooms,$departments,$sections,$users,$show_add_issue); echo $this->assign_issue_modal($users); echo $this->edit_issue_modal(); echo $this->progress_issue_modal(); echo $this->issue_documents_modal(); echo $this->issue_history_toggle_script(); return $this->shell('Issue Master',ob_get_clean(),'issues');
     }
 
     private function normalize_mobile_number($value){
@@ -2463,19 +3487,48 @@ class HRIM_Core {
         return [
             'enabled'=>get_option('hrim_telegram_enabled','0')==='1',
             'bot_token'=>(string)get_option('hrim_telegram_bot_token',''),
+            'group_chat_id'=>sanitize_text_field(get_option('hrim_telegram_group_chat_id',get_option('hrim_telegram_test_chat_id',''))),
             'test_chat_id'=>sanitize_text_field(get_option('hrim_telegram_test_chat_id','')),
+        ];
+    }
+    private function message_auto_sender_settings(){
+        return [
+            'enabled'=>get_option('hrim_mas_enabled','0')==='1',
+            'user_id'=>(string)get_option('hrim_mas_user_id',''),
+            'password'=>(string)get_option('hrim_mas_password',''),
+            'group_id'=>sanitize_text_field(get_option('hrim_mas_group_id','')),
         ];
     }
     private function notification_rules(){
         $defaults=[
-            'pending_issues'=>['enabled'=>0,'interval_minutes'=>1440,'head'=>1,'telegram'=>1],
-            'upcoming_periodic'=>['enabled'=>0,'interval_minutes'=>1440,'days_before'=>3,'head'=>1,'telegram'=>1],
-            'scheduled_not_started'=>['enabled'=>0,'interval_minutes'=>1440,'head'=>1,'telegram'=>1],
-            'scheduled_in_progress'=>['enabled'=>0,'interval_minutes'=>1440,'head'=>1,'telegram'=>1],
+            'unresolved_issues'=>['enabled'=>0,'start_time'=>'09:00','interval_minutes'=>180,'message_auto_sender'=>1,'telegram'=>1],
+            'pending_supervision'=>['enabled'=>0,'start_time'=>'09:00','interval_minutes'=>180,'message_auto_sender'=>1,'telegram'=>1],
         ];
         $saved=get_option('hrim_notification_rules',[]);
+        // Map the old pending issue rule once so existing sites do not lose the setting.
+        if(empty($saved['unresolved_issues']) && !empty($saved['pending_issues'])) $saved['unresolved_issues']=$saved['pending_issues'];
         foreach($defaults as $key=>$rule) if(!empty($saved[$key])&&is_array($saved[$key])) $defaults[$key]=array_merge($rule,$saved[$key]);
         return $defaults;
+    }
+    private function send_message_auto_sender($message){
+        $settings=$this->message_auto_sender_settings();
+        if(!$settings['enabled']) return new WP_Error('mas_disabled','Message Auto Sender notifications are disabled.');
+        if($settings['user_id']===''||$settings['password']===''||$settings['group_id']==='') return new WP_Error('mas_incomplete','Message Auto Sender User ID, Password or Group ID is missing.');
+        $url='https://app.messageautosender.com/api/v1/message/create';
+        $payload=['recipientIds'=>[$settings['group_id']],'message'=>[(string)$message]];
+        $response=wp_remote_post($url,[
+            'timeout'=>25,
+            'headers'=>[
+                'Accept'=>'application/json',
+                'Authorization'=>'Basic '.base64_encode($settings['user_id'].':'.$settings['password']),
+                'Content-Type'=>'application/json',
+            ],
+            'body'=>wp_json_encode($payload),
+        ]);
+        if(is_wp_error($response)) return $response;
+        $code=(int)wp_remote_retrieve_response_code($response); $body=wp_remote_retrieve_body($response);
+        if($code<200||$code>=300) return new WP_Error('mas_api_error','Message Auto Sender returned HTTP '.$code,$body);
+        return true;
     }
     private function send_telegram_message($chat_id,$message,$image_url=''){
         $settings=$this->telegram_settings();
@@ -2524,16 +3577,35 @@ class HRIM_Core {
         }
         return $ids?wp_get_attachment_url((int)$ids[0]):'';
     }
+    private function trim_notification_logs($keep=20){
+        global $wpdb;
+        $keep=max(1,absint($keep));
+        $table=$wpdb->prefix.'hrim_notification_log';
+        $cutoff_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} ORDER BY id DESC LIMIT 1 OFFSET %d",$keep-1));
+        if($cutoff_id>0) $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE id < %d",$cutoff_id));
+    }
+    private function remember_notification_event($event_key){
+        if(!$event_key) return;
+        $events=get_option('hrim_notification_sent_events',[]); if(!is_array($events))$events=[];
+        $events[$event_key]=time();
+        if(count($events)>1000){asort($events,SORT_NUMERIC);$events=array_slice($events,-1000,null,true);}
+        update_option('hrim_notification_sent_events',$events,false);
+    }
     private function log_notification($event_key,$type,$department_id,$channel,$destination,$message,$result){
         global $wpdb; $ok=!is_wp_error($result);
         $wpdb->insert($wpdb->prefix.'hrim_notification_log',['event_key'=>$event_key,'notification_type'=>$type,'department_id'=>$department_id?:null,'channel'=>$channel,'destination'=>$destination,'message'=>$message,'status'=>$ok?'sent':'failed','api_response'=>$ok?'Accepted':$result->get_error_message(),'attempts'=>1,'scheduled_at'=>$this->ist_now_mysql(),'sent_at'=>$ok?$this->ist_now_mysql():null]);
+        if($ok)$this->remember_notification_event($event_key);
+        $this->trim_notification_logs(20);
         return $ok;
     }
     private function notification_already_sent($event_key,$interval_minutes=0){
         global $wpdb; if(!$event_key) return false;
         $sql="SELECT id FROM {$wpdb->prefix}hrim_notification_log WHERE event_key=%s AND status='sent'"; $args=[$event_key];
         if($interval_minutes>0){$sql.=' AND created_at >= DATE_SUB(NOW(), INTERVAL %d MINUTE)';$args[]=$interval_minutes;}
-        $sql.=' LIMIT 1'; return (bool)$wpdb->get_var($wpdb->prepare($sql,$args));
+        $sql.=' LIMIT 1'; if((bool)$wpdb->get_var($wpdb->prepare($sql,$args)))return true;
+        $events=get_option('hrim_notification_sent_events',[]); if(!is_array($events)||empty($events[$event_key]))return false;
+        if($interval_minutes>0)return (time()-(int)$events[$event_key])<=($interval_minutes*60);
+        return true;
     }
     private function department_destinations($department,$rule=[]){
         $dest=[];
@@ -2563,46 +3635,171 @@ class HRIM_Core {
             if($this->log_notification($event,$type,(int)$department->id,$dest['channel'],$dest['destination'],$message,$result))$sent++;
         } return $sent;
     }
-    private function notify_department_for_issue($issue_id){
+    private function dispatch_group_notification($type,$message,$event_key,$send_mas=true,$send_telegram=true){
+        $sent=0;
+        if($send_mas){
+            $mas=$this->message_auto_sender_settings();
+            if($mas['enabled'] && $mas['group_id']!==''){
+                $key=$event_key.':message_auto_sender';
+                if(!$this->notification_already_sent($key,0)){
+                    $result=$this->send_message_auto_sender($message);
+                    if($this->log_notification($key,$type,0,'message_auto_sender',$mas['group_id'],$message,$result)) $sent++;
+                }
+            }
+        }
+        if($send_telegram){
+            $tg=$this->telegram_settings();
+            if($tg['enabled'] && $tg['group_chat_id']!==''){
+                $key=$event_key.':telegram_group';
+                if(!$this->notification_already_sent($key,0)){
+                    $result=$this->send_telegram_message($tg['group_chat_id'],$message);
+                    if($this->log_notification($key,$type,0,'telegram_group',$tg['group_chat_id'],$message,$result)) $sent++;
+                }
+            }
+        }
+        return $sent;
+    }
+    private function issue_group_context($issue_id){
         global $wpdb;
-        $issue=$wpdb->get_row($wpdb->prepare("SELECT x.*,d.name department_name,d.department_head_user_id,d.telegram_chat_id,d.notify_head_enabled,d.notify_telegram_enabled,r.room_no,f.name floor_name,s.name section_name FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=x.floor_id LEFT JOIN {$wpdb->prefix}hrim_sections s ON s.id=x.section_id WHERE x.id=%d",$issue_id));
-        if(!$issue||!$issue->department_id)return false;
-        $location=trim(($issue->floor_name?:'').' / '.($issue->room_no?:''),' /');
-        $message="New Issue Created\nIssue ID: #{$issue->id}\nDepartment: ".($issue->department_name?:'—')."\nLocation: ".($location?:'—')."\nSection: ".($issue->section_name?:'—')."\nCheckpoint: ".($issue->title?:'—')."\nIssue: ".($issue->description?:'—');
-        $params=['#'.$issue->id,$issue->department_name?:'—',$location?:'—',$issue->section_name?:'—',$issue->title?:'—',$issue->description?:'—'];
-        return $this->dispatch_department_message($issue,'new_issue',$message,'issue:'.$issue->id,['head'=>1,'telegram'=>1,'interval_minutes'=>0],$params,$this->issue_notification_image_url($issue->id));
+        return $wpdb->get_row($wpdb->prepare("SELECT x.*,d.name department_name,r.room_no,f.name floor_name,s.name section_name,au.display_name assigned_name FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=x.floor_id LEFT JOIN {$wpdb->prefix}hrim_sections s ON s.id=x.section_id LEFT JOIN {$wpdb->users} au ON au.ID=x.assigned_to WHERE x.id=%d",$issue_id));
+    }
+    private function notify_department_for_issue($issue_id){
+        $issue=$this->issue_group_context($issue_id); if(!$issue) return false;
+        $message="*🚨 Issue Created*\n\n".
+            "*Department:* ".($issue->department_name?:'—')."\n".
+            "*Floor:* ".($issue->floor_name?:'—')."\n".
+            "*Asset:* ".($issue->room_no?:'—')."\n".
+            "*Checkpoint:* ".($issue->title?:'—')."\n".
+            "*Issue:* ".($issue->description?:$issue->title?:'—')."\n".
+            "*Assigned To:* ".($issue->assigned_name?:'—')."\n".
+            "*Issue Date:* ".(!empty($issue->created_at)?$this->ist_date('d/m/Y',$issue->created_at):$this->ist_date('d/m/Y'));
+        return $this->dispatch_group_notification('issue_created',$message,'issue_created:'.$issue->id);
     }
     private function notify_department_for_issue_update($issue_id,$event_label,$details=''){
-        global $wpdb;
-        $issue=$wpdb->get_row($wpdb->prepare("SELECT x.*,d.name department_name,d.department_head_user_id,d.telegram_chat_id,d.notify_head_enabled,d.notify_telegram_enabled,r.room_no,f.name floor_name,s.name section_name FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=x.floor_id LEFT JOIN {$wpdb->prefix}hrim_sections s ON s.id=x.section_id WHERE x.id=%d",$issue_id));
-        if(!$issue||!$issue->department_id)return false;
-        $location=trim(($issue->floor_name?:'').' / '.($issue->room_no?:''),' /');
-        $message="Issue Update\nIssue ID: #{$issue->id}\nUpdate: ".$event_label."\nDepartment: ".($issue->department_name?:'—')."\nLocation: ".($location?:'—')."\nSection: ".($issue->section_name?:'—')."\nIssue: ".($issue->title?:'—');
-        if(trim((string)$details)!=='')$message.="\nDetails: ".trim((string)$details);
-        $event_key='issue_update:'.$issue->id.':'.sanitize_key($event_label).':'.microtime(true);
-        return $this->dispatch_department_message($issue,'issue_update',$message,$event_key,['head'=>1,'telegram'=>1,'interval_minutes'=>0],[],$this->issue_notification_image_url($issue->id));
+        global $wpdb; $issue=$this->issue_group_context($issue_id); if(!$issue) return false;
+        $latest=$wpdb->get_row($wpdb->prepare("SELECT u.*,usr.display_name updated_name FROM {$wpdb->prefix}hrim_issue_updates u LEFT JOIN {$wpdb->users} usr ON usr.ID=u.updated_by WHERE u.issue_id=%d ORDER BY u.id DESC LIMIT 1",$issue_id));
+        $is_supervision=$latest && strtolower((string)$latest->update_type)==='supervision';
+        $date=$latest && $latest->update_date?$this->ist_date('d/m/Y',$latest->update_date):$this->ist_date('d/m/Y');
+        $by=$latest && $latest->updated_name?$latest->updated_name:wp_get_current_user()->display_name;
+        if($is_supervision){
+            $raw=(string)($latest->remarks??''); $satisfied=''; $remarks=trim((string)$details);
+            if(preg_match('/Satisfied with work:\s*(Yes|No)/i',$raw,$m)) $satisfied=ucfirst(strtolower($m[1]));
+            if(preg_match('/Supervision Remarks:\s*(.*)$/is',$raw,$m)) $remarks=trim($m[1]);
+            $message="*✅ Supervision Done*\n\n".
+                "*Department:* ".($issue->department_name?:'—')."\n".
+                "*Floor:* ".($issue->floor_name?:'—')."\n".
+                "*Asset:* ".($issue->room_no?:'—')."\n".
+                "*Checkpoint:* ".($issue->title?:'—')."\n".
+                "*Issue:* ".($issue->description?:$issue->title?:'—')."\n".
+                "*Supervision By:* ".($by?:'—')."\n".
+                "*Supervision Date:* ".$date."\n".
+                "*Supervision Remarks:* ".($remarks?:'—')."\n".
+                "*Satisfied with Work:* ".($satisfied?:'—');
+            return $this->dispatch_group_notification('supervision_updated',$message,'supervision_updated:'.$issue_id.':'.($latest->id??microtime(true)));
+        }
+        $remarks=$latest && trim((string)$latest->remarks)!==''?trim((string)$latest->remarks):trim((string)$details);
+        $message="*🔧 Issue Updated*\n\n".
+            "*Department:* ".($issue->department_name?:'—')."\n".
+            "*Floor:* ".($issue->floor_name?:'—')."\n".
+            "*Asset:* ".($issue->room_no?:'—')."\n".
+            "*Checkpoint:* ".($issue->title?:'—')."\n".
+            "*Issue:* ".($issue->description?:$issue->title?:'—')."\n".
+            "*Updated By:* ".($by?:'—')."\n".
+            "*Update Date:* ".$date."\n".
+            "*Update Remarks:* ".($remarks?:'—');
+        return $this->dispatch_group_notification('issue_updated',$message,'issue_updated:'.$issue_id.':'.($latest->id??microtime(true)));
     }
-    public function run_notification_triggers(){
-        if(get_option('hrim_notifications_enabled','0')!=='1') return;
-        global $wpdb; $rules=$this->notification_rules(); $today=$this->ist_date('Y-m-d');
-        $departments=$wpdb->get_results("SELECT * FROM {$wpdb->prefix}hrim_departments WHERE status='active'");
-        foreach($departments as $department){
-            if(!empty($rules['pending_issues']['enabled'])){
-                $rows=$wpdb->get_results($wpdb->prepare("SELECT x.id,x.title,x.status,r.room_no FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id WHERE x.department_id=%d AND x.status NOT IN ('resolved','closed','verified') ORDER BY x.due_date IS NULL,x.due_date,x.id",$department->id));
-                if($rows){$assets=[];foreach($rows as $r)$assets[]=(($r->room_no?:'Asset').' — '.$r->title);$message="Pending Issues — {$department->name}\nTotal: ".count($rows)."\n".implode("\n",array_slice($assets,0,20) );$this->dispatch_department_message($department,'pending_issues',$message,'pending:'.$department->id,$rules['pending_issues']);}
+    private function notification_rule_slot($rule,$key){
+        $start=(string)($rule['start_time']??'09:00'); if(!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/',$start)) $start='09:00';
+        $now_h=(int)$this->ist_date('H'); $now_m=(int)$this->ist_date('i'); $now=$now_h*60+$now_m;
+        [$sh,$sm]=array_map('intval',explode(':',$start)); $begin=$sh*60+$sm; if($now<$begin) return false;
+        $interval=max(0,absint($rule['interval_minutes']??0));
+        $slot=$interval>0?(int)floor(($now-$begin)/$interval):0;
+        return $key.':'.$this->ist_date('Y-m-d').':'.$slot;
+    }
+    public function run_notification_triggers($force=false){
+        // Scheduled cron respects the main engine switch. Manual "Run Now" is a testing action
+        // and is allowed to evaluate active rules immediately, irrespective of the configured
+        // start time / interval. It also uses a unique event key so repeated tests can be sent.
+        if(!$force && get_option('hrim_notifications_enabled','0')!=='1') return;
+        global $wpdb; $rules=$this->notification_rules();
+        $manual_run_id=$force ? ('manual:'.$this->ist_date('YmdHis').':'.wp_generate_password(6,false,false)) : '';
+
+        // Scheduled Unresolved Issues reminders: one separate message per Department,
+        // with that Department's issues grouped floor-wise.
+        if(!empty($rules['unresolved_issues']['enabled'])){
+            $rule=$rules['unresolved_issues']; $slot=$force ? $manual_run_id.':unresolved' : $this->notification_rule_slot($rule,'unresolved');
+            if($slot){
+                $rows=$wpdb->get_results("SELECT x.id,x.department_id,x.title,x.description,x.created_at,r.room_no,f.name floor_name,f.sort_order floor_order,d.name department_name,d.sort_order department_order FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=x.floor_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id WHERE x.status NOT IN ('resolved','verified','closed') ORDER BY COALESCE(d.sort_order,9999),d.name,COALESCE(f.sort_order,9999),f.name,r.room_no,x.id");
+                if($rows){
+                    $departments=[];
+                    foreach($rows as $r){
+                        $dept_key=(int)($r->department_id??0);
+                        if(!isset($departments[$dept_key])) $departments[$dept_key]=['name'=>trim((string)($r->department_name??''))?:'General','rows'=>[]];
+                        $departments[$dept_key]['rows'][]=$r;
+                    }
+                    foreach($departments as $dept_id=>$dept){
+                        $dept_rows=$dept['rows']; if(!$dept_rows) continue;
+                        $floor_groups=[];
+                        foreach($dept_rows as $r){$floor=trim((string)($r->floor_name??''))?:'General';$floor_groups[$floor][]=$r;}
+                        // v3.19.86: show the Department name in each department-wise reminder message.
+                        $lines=["⚠️ Unresolved Issues Reminder","","Department: *".$dept['name']."*","Total Pending: *".count($dept_rows)."*",""];
+                        foreach($floor_groups as $floor=>$items){
+                            $lines[]='*'.$floor.'*';
+                            $lines[]='';
+                            foreach($items as $r){
+                                $checkpoint=trim((string)($r->title??''))!==''?$r->title:'—';
+                                $issue=trim((string)($r->description??''))!==''?$r->description:'—';
+                                $lines[]=($r->room_no?:'—').' | *'.$checkpoint.'* | '.$issue.' | '.(!empty($r->created_at)?$this->ist_date('d/m/Y',$r->created_at):'—');
+                                $lines[]='';
+                            }
+                        }
+                        $lines[]='Please update the pending issues.';
+                        $lines[]='Update link - '.home_url('/hotel-inspection-pending-issues/');
+                        $message=implode("\n",$lines);
+                        $event='reminder:'.$slot.':department:'.(int)$dept_id;
+                        $this->dispatch_group_notification('unresolved_issues_reminder',$message,$event,!empty($rule['message_auto_sender']),!empty($rule['telegram']));
+                    }
+                }
             }
-            if(!empty($rules['upcoming_periodic']['enabled'])){
-                $days=max(0,(int)$rules['upcoming_periodic']['days_before']);
-                $rows=$wpdb->get_results($wpdb->prepare("SELECT i.id,i.due_date,t.task_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE t.department_id=%d AND i.status='upcoming' AND i.due_date BETWEEN %s AND DATE_ADD(%s,INTERVAL %d DAY) ORDER BY i.due_date",$department->id,$today,$today,$days));
-                if($rows){$lines=[];foreach($rows as $r)$lines[]=$r->task_name.' — '.$this->ist_date('d/m/Y',$r->due_date);$message="Upcoming Periodic Checks — {$department->name}\n".implode("\n",$lines );$this->dispatch_department_message($department,'upcoming_periodic',$message,'upcoming:'.$department->id,$rules['upcoming_periodic']);}
-            }
-            if(!empty($rules['scheduled_not_started']['enabled'])){
-                $rows=$wpdb->get_results($wpdb->prepare("SELECT i.id,i.due_date,t.task_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE t.department_id=%d AND i.status='upcoming' AND i.due_date<=%s ORDER BY i.due_date",$department->id,$today));
-                if($rows){$lines=[];foreach($rows as $r)$lines[]=$r->task_name.' — Due '.$this->ist_date('d/m/Y',$r->due_date);$message="Scheduled Tasks Not Yet Started — {$department->name}\n".implode("\n",$lines );$this->dispatch_department_message($department,'scheduled_not_started',$message,'notstarted:'.$department->id,$rules['scheduled_not_started']);}
-            }
-            if(!empty($rules['scheduled_in_progress']['enabled'])){
-                $rows=$wpdb->get_results($wpdb->prepare("SELECT i.id,i.due_date,t.task_name FROM {$wpdb->prefix}hrim_periodic_task_instances i JOIN {$wpdb->prefix}hrim_periodic_tasks t ON t.id=i.task_id WHERE t.department_id=%d AND i.status='in_progress' ORDER BY i.due_date",$department->id));
-                foreach($rows as $r){$pending=$wpdb->get_col($wpdb->prepare("SELECT a.room_no FROM {$wpdb->prefix}hrim_periodic_task_rooms pr JOIN {$wpdb->prefix}hrim_rooms a ON a.id=pr.room_id WHERE pr.instance_id=%d AND pr.status<>'completed' ORDER BY a.room_no",$r->id));if(!$pending)continue;$message="Scheduled Task In Progress — {$department->name}\nTask: {$r->task_name}\nPending Assets (".count($pending)."):\n".implode(', ',array_slice($pending,0,30))."\nDue: ".$this->ist_date('d/m/Y',$r->due_date );$this->dispatch_department_message($department,'scheduled_in_progress',$message,'inprogress:'.$r->id,$rules['scheduled_in_progress']);}
+        }
+
+        // Scheduled Pending Supervision reminders: one separate message per Department,
+        // with that Department's issues grouped floor-wise.
+        if(!empty($rules['pending_supervision']['enabled'])){
+            $rule=$rules['pending_supervision']; $slot=$force ? $manual_run_id.':pending_supervision' : $this->notification_rule_slot($rule,'pending_supervision');
+            if($slot){
+                $rows=$wpdb->get_results("SELECT x.id,x.department_id,x.title,x.description,r.room_no,f.name floor_name,f.sort_order floor_order,d.name department_name,d.sort_order department_order,(SELECT u.update_date FROM {$wpdb->prefix}hrim_issue_updates u WHERE u.issue_id=x.id AND u.update_type='progress' ORDER BY u.id DESC LIMIT 1) update_date FROM {$wpdb->prefix}hrim_issues x LEFT JOIN {$wpdb->prefix}hrim_rooms r ON r.id=x.room_id LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=x.floor_id LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=x.department_id WHERE x.status='resolved' ORDER BY COALESCE(d.sort_order,9999),d.name,COALESCE(f.sort_order,9999),f.name,r.room_no,x.id");
+                if($rows){
+                    $departments=[];
+                    foreach($rows as $r){
+                        $dept_key=(int)($r->department_id??0);
+                        if(!isset($departments[$dept_key])) $departments[$dept_key]=['name'=>trim((string)($r->department_name??''))?:'General','rows'=>[]];
+                        $departments[$dept_key]['rows'][]=$r;
+                    }
+                    foreach($departments as $dept_id=>$dept){
+                        $dept_rows=$dept['rows']; if(!$dept_rows) continue;
+                        $floor_groups=[];
+                        foreach($dept_rows as $r){$floor=trim((string)($r->floor_name??''))?:'General';$floor_groups[$floor][]=$r;}
+                        // v3.19.86: show the Department name in each department-wise reminder message.
+                        $lines=["👁️ Pending Supervision Reminder","","Department: *".$dept['name']."*","Total Pending: *".count($dept_rows)."*",""];
+                        foreach($floor_groups as $floor=>$items){
+                            $lines[]='*'.$floor.'*';
+                            $lines[]='';
+                            foreach($items as $r){
+                                $checkpoint=trim((string)($r->title??''))!==''?$r->title:'—';
+                                $issue=trim((string)($r->description??''))!==''?$r->description:'—';
+                                $lines[]=($r->room_no?:'—').' | *'.$checkpoint.'* | '.$issue.' | '.($r->update_date?$this->ist_date('d/m/Y',$r->update_date):'—');
+                                $lines[]='';
+                            }
+                        }
+                        $lines[]='Please complete the pending supervision.';
+                        $lines[]='Update link - '.home_url('/hotel-inspection-pending-supervision/');
+                        $message=implode("\n",$lines);
+                        $event='reminder:'.$slot.':department:'.(int)$dept_id;
+                        $this->dispatch_group_notification('pending_supervision_reminder',$message,$event,!empty($rule['message_auto_sender']),!empty($rule['telegram']));
+                    }
+                }
             }
         }
         update_option('hrim_notifications_last_run',$this->ist_now_mysql(),false);
@@ -2624,8 +3821,8 @@ class HRIM_Core {
         $department_users=get_users(['role__in'=>['hrim_owner','hrim_manager','hrim_supervisor','hrim_worker','hrim_inspector','hrim_housekeeping'],'orderby'=>'display_name','number'=>-1]);
         $rows=$wpdb->get_results("SELECT d.*,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_sections s WHERE s.department_id=d.id) section_count,(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_user_departments ud WHERE ud.department_id=d.id) user_count FROM {$wpdb->prefix}hrim_departments d ORDER BY d.name,d.id");
         ob_start(); ?>
-        <?php echo $this->master_import_feedback('departments'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('departments'); ?><?php echo $this->excel_button('departments'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-departments'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Department</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Department</th><th>Department Head</th><th>Telegram Group</th><th>Description</th><th>Sections</th><th>Users</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html($r->name); ?></strong></td><td><?php $head=$r->department_head_user_id?get_userdata((int)$r->department_head_user_id):null; echo $head?esc_html($head->display_name):'<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->telegram_chat_id?:'—'); ?></td><td><?php echo $r->description!=='' && $r->description!==null ? nl2br(esc_html($r->description)) : '<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->section_count); ?></td><td><?php echo esc_html($r->user_count); ?></td><td><?php echo $this->action_buttons('department',$r->id,'hotel-inspection-departments'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="8" class="hrim-empty">No departments found.</td></tr><?php endif; ?></tbody></table></div></div>
-        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-departments')); ?>">×</a><h2><?php echo $edit?'Edit Department':'Add Department'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_department"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_department'); ?><label>Department Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Department Head<select name="department_head_user_id"><option value="">Select Department Head</option><?php foreach($department_users as $department_user): $head_mobile=$this->normalize_mobile_number(get_user_meta($department_user->ID,'hrim_mobile',true)); ?><option value="<?php echo esc_attr($department_user->ID); ?>" <?php selected($edit->department_head_user_id??0,$department_user->ID); ?>><?php echo esc_html($department_user->display_name.($head_mobile?' — '.$head_mobile:' — Mobile missing')); ?></option><?php endforeach; ?></select></label><label>Telegram Group Chat ID<input name="telegram_chat_id" value="<?php echo esc_attr($edit->telegram_chat_id??''); ?>" placeholder="Example: -1001234567890"></label><div class="hrim-grid-2"><label class="hrim-checkbox-row"><input type="checkbox" name="notify_head_enabled" value="1" <?php checked(!isset($edit->notify_head_enabled)||$edit->notify_head_enabled); ?>><span>Notify Department Head</span></label><label class="hrim-checkbox-row"><input type="checkbox" name="notify_telegram_enabled" value="1" <?php checked($edit->notify_telegram_enabled??0); ?>><span>Notify Telegram Group</span></label></div><label>Description<textarea name="description"><?php echo esc_textarea($edit->description??''); ?></textarea></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
+        <?php echo $this->master_import_feedback('departments'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('departments'); ?><?php echo $this->excel_button('departments','hrimDepartmentsExportTable'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-departments'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add Department</a></div></div><div class="hrim-table-wrap"><table id="hrimDepartmentsExportTable" class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Department</th><th>Department Head</th><th>Sections</th><th>Users</th><th class="hrim-no-export">Actions</th></tr></thead><tbody><?php $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><strong><?php echo esc_html($r->name); ?></strong></td><td><?php $head=$r->department_head_user_id?get_userdata((int)$r->department_head_user_id):null; echo $head?esc_html($head->display_name):'<span class="hrim-muted">—</span>'; ?></td><td><?php echo esc_html($r->section_count); ?></td><td><?php echo esc_html($r->user_count); ?></td><td><?php echo $this->action_buttons('department',$r->id,'hotel-inspection-departments'); ?></td></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="6" class="hrim-empty">No departments found.</td></tr><?php endif; ?></tbody></table></div></div>
+        <?php if($show_form): ?><div class="hrim-modal open"><div class="hrim-modal-card"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-departments')); ?>">×</a><h2><?php echo $edit?'Edit Department':'Add Department'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_department"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_department'); ?><label>Department Name<input name="name" required value="<?php echo esc_attr($edit->name??''); ?>"></label><label>Department Head *<select name="department_head_user_id" required><option value="">Select Department Head</option><?php foreach($department_users as $department_user): $head_mobile=$this->normalize_mobile_number(get_user_meta($department_user->ID,'hrim_mobile',true)); ?><option value="<?php echo esc_attr($department_user->ID); ?>" <?php selected($edit->department_head_user_id??0,$department_user->ID); ?>><?php echo esc_html($department_user->display_name.($head_mobile?' — '.$head_mobile:' — Mobile missing')); ?></option><?php endforeach; ?></select></label><label>Telegram Group Chat ID<input name="telegram_chat_id" value="<?php echo esc_attr($edit->telegram_chat_id??''); ?>" placeholder="Example: -1001234567890"></label><div class="hrim-grid-2"><label class="hrim-checkbox-row"><input type="checkbox" name="notify_head_enabled" value="1" <?php checked(!isset($edit->notify_head_enabled)||$edit->notify_head_enabled); ?>><span>Notify Department Head</span></label><label class="hrim-checkbox-row"><input type="checkbox" name="notify_telegram_enabled" value="1" <?php checked($edit->notify_telegram_enabled??0); ?>><span>Notify Telegram Group</span></label></div><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update':'Save'; ?></button></div></form></div></div><?php endif; ?>
         <?php echo $this->master_import_modal('departments'); return $this->shell('Departments',ob_get_clean(),'departments');
     }
 
@@ -2636,13 +3833,17 @@ class HRIM_Core {
         $edit=$edit_id?get_userdata($edit_id):null;
         $users=get_users(['role__in'=>['administrator','hrim_owner','hrim_manager','hrim_supervisor','hrim_worker','hrim_inspector','hrim_housekeeping'],'orderby'=>'display_name','number'=>-1,'cache_results'=>false]);
         global $wpdb;
-        $departments=$this->active_departments();
-        $edit_departments=$edit_id?array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT department_id FROM {$wpdb->prefix}hrim_user_departments WHERE user_id=%d",$edit_id))):[];
         $view_map=$this->configurable_view_map();
         $edit_allowed_views=$edit_id?$this->get_user_allowed_view_slugs($edit_id):$this->all_view_slugs();
+        // Reports stays internally registered for compatibility, but is not configurable from User View Access.
+        unset($view_map['reports']);
+        $edit_allowed_views=array_values(array_diff($edit_allowed_views,['hotel-inspection-reports']));
+        // v3.19.15: Issue views are mandatory for every active organization user, so do not show them as restrictions.
+        foreach(['add_issue','pending_issues','pending_supervision','issues'] as $mandatory_issue_key) unset($view_map[$mandatory_issue_key]);
+        $edit_allowed_views=array_values(array_diff($edit_allowed_views,$this->global_issue_view_slugs()));
         ob_start(); ?>
-        <?php echo $this->master_import_feedback('users'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('users'); ?><?php echo $this->excel_button('users'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-users'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add User</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Name</th><th>Username</th><th>Email</th><th>Mobile</th><th>Role</th><th>Departments</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($users as $u): $is_admin=in_array('administrator',$u->roles,true); $status=$this->user_is_active($u->ID)?'active':'inactive'; ?><tr><td><?php echo ++$sl; ?></td><td><?php echo esc_html($u->display_name); ?></td><td><?php echo esc_html($u->user_login); ?></td><td><?php echo esc_html($u->user_email); ?></td><td><?php echo esc_html(get_user_meta($u->ID,'hrim_mobile',true)?:'—'); ?></td><td><?php echo esc_html(ucwords(str_replace(['hrim_','_'],' ',$u->roles[0]??''))); ?></td><td><?php $ud=$wpdb->get_col($wpdb->prepare("SELECT d.name FROM {$wpdb->prefix}hrim_user_departments m INNER JOIN {$wpdb->prefix}hrim_departments d ON d.id=m.department_id WHERE m.user_id=%d ORDER BY d.sort_order,d.name",$u->ID)); echo esc_html($is_admin||in_array($u->roles[0]??'',['hrim_owner','hrim_manager'],true)?'All Departments':($ud?implode(', ',$ud):'—')); ?></td><td><?php if($is_admin): ?><span class="hrim-status-pill is-active">Active</span><?php else: ?><form class="hrim-inline hrim-user-status-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_update_user_status"><input type="hidden" name="id" value="<?php echo esc_attr($u->ID); ?>"><?php wp_nonce_field('hrim_update_user_status_'.$u->ID); ?><select name="status" class="hrim-user-status-select" onchange="this.form.submit()"><option value="active" <?php selected($status,'active'); ?>>Active</option><option value="inactive" <?php selected($status,'inactive'); ?>>Inactive</option></select></form><?php endif; ?></td><td><?php if($is_admin): ?><small>System</small><?php else: ?><?php echo $this->action_buttons('user',$u->ID,'hotel-inspection-users'); ?><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></div>
-        <?php if($show_form): $edit_status=$edit?$this->user_is_active($edit_id):true; ?><div class="hrim-modal open"><div class="hrim-modal-card hrim-modal-wide"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-users')); ?>">×</a><h2><?php echo $edit?'Edit Application User':'Add Application User'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_user"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_user'); ?><label>Full Name *<input name="display_name" required value="<?php echo esc_attr($edit->display_name??''); ?>"></label><label>Username *<input name="username" required <?php echo $edit?'readonly':''; ?> value="<?php echo esc_attr($edit->user_login??''); ?>"></label><label>Email *<input type="email" name="email" required value="<?php echo esc_attr($edit->user_email??''); ?>"></label><label>Mobile *<input type="tel" name="mobile" required inputmode="numeric" placeholder="919876543210" value="<?php echo esc_attr($edit?get_user_meta($edit_id,'hrim_mobile',true):''); ?>"><small>Enter country code and mobile number without spaces, for example 919876543210.</small></label><label><?php echo $edit?'New Password (leave blank to retain current)':'Password *'; ?><input type="password" name="password" minlength="8" <?php echo $edit?'':'required'; ?>></label><label>Role *<select name="role" required><option value="">Select Role</option><option value="hrim_worker" <?php selected($edit->roles[0]??'','hrim_worker'); ?>>Worker</option><option value="hrim_supervisor" <?php selected($edit->roles[0]??'','hrim_supervisor'); ?>>Supervisor</option><option value="hrim_manager" <?php selected($edit->roles[0]??'','hrim_manager'); ?>>Manager</option><option value="hrim_owner" <?php selected($edit->roles[0]??'','hrim_owner'); ?>>Owner</option></select></label><div class="hrim-user-department-field"><span class="hrim-field-label">Departments *</span><div class="hrim-multiselect" data-placeholder="Select"><button type="button" class="hrim-multiselect-toggle" aria-expanded="false"><span class="hrim-multiselect-value">Select</span><span class="hrim-multiselect-arrow">⌃</span></button><div class="hrim-multiselect-panel" hidden><input type="search" class="hrim-multiselect-search" placeholder="Search..."><div class="hrim-multiselect-tools"><button type="button" class="hrim-multiselect-all">☷ ALL</button><button type="button" class="hrim-multiselect-clear">⌫ CLEAR</button></div><div class="hrim-multiselect-options"><?php foreach($departments as $department): ?><label class="hrim-multiselect-option"><input type="checkbox" name="department_ids[]" value="<?php echo esc_attr($department->id); ?>" <?php checked(in_array((int)$department->id,$edit_departments,true)); ?>><span><?php echo esc_html($department->name); ?></span></label><?php endforeach; ?></div></div></div></div><div class="hrim-user-view-permissions"><div class="hrim-user-view-permissions-head"><span class="hrim-field-label">View Access</span><label class="hrim-check hrim-view-select-all"><input type="checkbox" class="hrim-view-select-all-checkbox" <?php checked(count($edit_allowed_views)===count($view_map)); ?>><span>Select All</span></label></div><div class="hrim-table-wrap hrim-view-access-desktop-wrap"><table class="hrim-table hrim-view-access-table hrim-view-access-table-desktop"><thead><tr><th>View Name</th><th>Show</th><th>View Name</th><th>Show</th></tr></thead><tbody><?php foreach(array_chunk($view_map,2,true) as $view_pair): $pair_values=array_values($view_pair); $left=$pair_values[0]??null; $right=$pair_values[1]??null; ?><tr><td><?php echo $left?esc_html($left['label']):''; ?></td><td><?php if($left): ?><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($left['slug']); ?>" <?php checked(in_array($left['slug'],$edit_allowed_views,true)); ?>></label><?php endif; ?></td><td><?php echo $right?esc_html($right['label']):''; ?></td><td><?php if($right): ?><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($right['slug']); ?>" <?php checked(in_array($right['slug'],$edit_allowed_views,true)); ?>></label><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div><div class="hrim-table-wrap hrim-view-access-mobile-wrap"><table class="hrim-table hrim-view-access-table hrim-view-access-table-mobile"><thead><tr><th>View Name</th><th>Show</th></tr></thead><tbody><?php foreach($view_map as $view_item): ?><tr><td><?php echo esc_html($view_item['label']); ?></td><td><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($view_item['slug']); ?>" <?php checked(in_array($view_item['slug'],$edit_allowed_views,true)); ?>></label></td></tr><?php endforeach; ?></tbody></table></div></div><label>Status *<select name="status" required><option value="">Select Status</option><option value="active" <?php selected($edit_status,true); ?>>Active</option><option value="inactive" <?php selected($edit_status,false); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update User':'Create User'; ?></button></div></form></div></div><?php endif; ?>
+        <?php echo $this->master_import_feedback('users'); ?><div class="hrim-panel hrim-master-panel"><div class="hrim-panel-head hrim-master-panel-head"><div class="hrim-toolbar hrim-master-toolbar"><input class="hrim-table-search" placeholder=""><?php echo $this->master_import_controls('users'); ?><?php echo $this->excel_button('users'); ?><a class="hrim-primary" href="<?php echo esc_url(add_query_arg('add','1',$this->page_url('hotel-inspection-users'))); ?>"><span class="dashicons dashicons-plus-alt2"></span> Add User</a></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Sl.</th><th>Name</th><th>Username</th><th>Email</th><th>Mobile</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody><?php $sl=0; foreach($users as $u): $is_admin=in_array('administrator',$u->roles,true); $status=$this->user_is_active($u->ID)?'active':'inactive'; ?><tr><td><?php echo ++$sl; ?></td><td><?php echo esc_html($u->display_name); ?></td><td><?php echo esc_html($u->user_login); ?></td><td><?php echo esc_html($u->user_email); ?></td><td><?php echo esc_html(get_user_meta($u->ID,'hrim_mobile',true)?:'—'); ?></td><td><?php echo esc_html(ucwords(str_replace(['hrim_','_'],' ',$u->roles[0]??''))); ?></td><td class="hrim-user-status-cell"><?php if($is_admin): ?><span class="hrim-status-toggle is-on is-disabled" role="switch" aria-checked="true" aria-label="Active status"><span class="hrim-status-toggle-knob"></span></span><?php else: ?><form class="hrim-inline hrim-user-status-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_update_user_status"><input type="hidden" name="id" value="<?php echo esc_attr($u->ID); ?>"><input type="hidden" name="status" value="<?php echo esc_attr($status); ?>"><?php wp_nonce_field('hrim_update_user_status_'.$u->ID); ?><label class="hrim-status-switch" title="<?php echo $status==='active'?'Active':'Inactive'; ?>"><input type="checkbox" <?php checked($status,'active'); ?> onchange="this.form.querySelector('input[name=status]').value=this.checked?'active':'inactive';this.form.submit();"><span class="hrim-status-toggle<?php echo $status==='active'?' is-on':''; ?>"><span class="hrim-status-toggle-knob"></span></span></label></form><?php endif; ?></td><td><?php if($is_admin): ?><small>System</small><?php else: ?><?php echo $this->action_buttons('user',$u->ID,'hotel-inspection-users'); ?><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div></div>
+        <?php if($show_form): $edit_status=$edit?$this->user_is_active($edit_id):true; ?><div class="hrim-modal open"><div class="hrim-modal-card hrim-modal-wide"><a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-users')); ?>">×</a><h2><?php echo $edit?'Edit Application User':'Add Application User'; ?></h2><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_user"><input type="hidden" name="id" value="<?php echo esc_attr($edit_id); ?>"><?php wp_nonce_field('hrim_save_user'); ?><label>Full Name *<input name="display_name" required value="<?php echo esc_attr($edit->display_name??''); ?>"></label><label>Username *<input name="username" required value="<?php echo esc_attr($edit->user_login??''); ?>"></label><label>Email<input type="email" name="email" value="<?php echo esc_attr($edit->user_email??''); ?>"></label><label>Mobile *<input type="tel" name="mobile" required inputmode="numeric" placeholder="919876543210" value="<?php echo esc_attr($edit?get_user_meta($edit_id,'hrim_mobile',true):''); ?>"><small>Enter country code and mobile number without spaces, for example 919876543210.</small></label><label><?php echo $edit?'New Password (leave blank to retain current)':'Password *'; ?><input type="password" name="password" minlength="8" <?php echo $edit?'':'required'; ?>></label><label>Role *<select name="role" required><option value="">Select Role</option><option value="hrim_worker" <?php selected($edit->roles[0]??'','hrim_worker'); ?>>Worker</option><option value="hrim_supervisor" <?php selected($edit->roles[0]??'','hrim_supervisor'); ?>>Supervisor</option><option value="hrim_manager" <?php selected($edit->roles[0]??'','hrim_manager'); ?>>Manager</option><option value="hrim_owner" <?php selected($edit->roles[0]??'','hrim_owner'); ?>>Owner</option></select></label><div class="hrim-user-view-permissions"><div class="hrim-user-view-permissions-head"><span class="hrim-field-label">View Access</span><label class="hrim-check hrim-view-select-all"><input type="checkbox" class="hrim-view-select-all-checkbox" <?php checked(count($edit_allowed_views)===count($view_map)); ?>><span>Select All</span></label></div><div class="hrim-table-wrap hrim-view-access-desktop-wrap"><table class="hrim-table hrim-view-access-table hrim-view-access-table-desktop"><thead><tr><th>View Name</th><th>Show</th><th>View Name</th><th>Show</th></tr></thead><tbody><?php foreach(array_chunk($view_map,2,true) as $view_pair): $pair_values=array_values($view_pair); $left=$pair_values[0]??null; $right=$pair_values[1]??null; ?><tr><td><?php echo $left?esc_html($left['label']):''; ?></td><td><?php if($left): ?><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($left['slug']); ?>" <?php checked(in_array($left['slug'],$edit_allowed_views,true)); ?>></label><?php endif; ?></td><td><?php echo $right?esc_html($right['label']):''; ?></td><td><?php if($right): ?><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($right['slug']); ?>" <?php checked(in_array($right['slug'],$edit_allowed_views,true)); ?>></label><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div><div class="hrim-table-wrap hrim-view-access-mobile-wrap"><table class="hrim-table hrim-view-access-table hrim-view-access-table-mobile"><thead><tr><th>View Name</th><th>Show</th></tr></thead><tbody><?php foreach($view_map as $view_item): ?><tr><td><?php echo esc_html($view_item['label']); ?></td><td><label class="hrim-check hrim-view-checkbox-wrap"><input type="checkbox" class="hrim-view-checkbox" name="allowed_views[]" value="<?php echo esc_attr($view_item['slug']); ?>" <?php checked(in_array($view_item['slug'],$edit_allowed_views,true)); ?>></label></td></tr><?php endforeach; ?></tbody></table></div></div><label>Status *<select name="status" required><option value="">Select Status</option><option value="active" <?php selected($edit_status,true); ?>>Active</option><option value="inactive" <?php selected($edit_status,false); ?>>Inactive</option></select></label><div class="hrim-form-actions"><button class="hrim-primary"><?php echo $edit?'Update User':'Create User'; ?></button></div></form></div></div><?php endif; ?>
         <?php echo $this->master_import_modal('users'); return $this->shell('Users',ob_get_clean(),'users');
     }
 
@@ -2659,29 +3860,57 @@ class HRIM_Core {
 
     public function settings_shortcode(){
         if(!$this->can_manage()) return $this->shell('Access Denied','<div class="hrim-alert error">You do not have permission.</div>','settings');
+        global $wpdb;
+        $property=$this->single_active_property();
+        $library_installed=get_option('hrim_checklist_library_version','')==='2.1';
         ob_start(); ?>
         <div class="hrim-settings-grid">
           <div class="hrim-panel"><div class="hrim-panel-head"><div><h2>General</h2></div></div>
-            <form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner><input type="hidden" name="action" value="hrim_save_settings"><?php wp_nonce_field('hrim_save_settings'); ?>
+            <form id="hrimGeneralSettingsForm" class="hrim-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner><input type="hidden" name="action" value="hrim_save_settings"><?php wp_nonce_field('hrim_save_settings'); ?>
+              <label>Property Name <span class="hrim-required-mark">*</span><input type="text" name="property_name" required value="<?php echo esc_attr($property->name??''); ?>" placeholder="Enter property name"></label>
+              <?php $property_logo_id=absint(get_option('hrim_property_logo_id',0)); $property_logo_url=$property_logo_id?wp_get_attachment_image_url($property_logo_id,'medium'):''; ?>
+              <label>Property Logo<input type="file" name="property_logo" accept="image/png,image/jpeg,image/webp,image/gif"><small>Upload PNG, JPG, WEBP or GIF. The logo will appear to the right of every view name.</small></label>
+              <?php if($property_logo_url): ?><div class="hrim-property-logo-preview"><span>Current Property Logo</span><img src="<?php echo esc_url($property_logo_url); ?>" alt="Property Logo"></div><?php endif; ?>
               <label>Accent Colour<input type="color" name="accent" value="<?php echo esc_attr(get_option('hrim_accent','#2563eb')); ?>"></label>
               <div class="hrim-settings-checkboxes">
                 <label class="hrim-checkbox-row"><input type="checkbox" name="show_room_score" value="1" <?php checked(get_option('hrim_show_room_score','1'),'1'); ?>><span>Show Room Score View</span></label>
-                <label class="hrim-checkbox-row"><input type="checkbox" name="show_floor_score" value="1" <?php checked(get_option('hrim_show_floor_score','1'),'1'); ?>><span>Show Floor Score View</span></label>
               </div>
-              <button class="hrim-primary">Save Settings</button>
+              <button id="hrimSaveSettingsButton" class="hrim-primary" type="submit" disabled>Save Settings</button>
             </form>
           </div>
           <div class="hrim-panel"><div class="hrim-panel-head"><div><h2>Application</h2></div></div>
             <div class="hrim-setting-actions">
-              <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner><input type="hidden" name="action" value="hrim_regenerate_pages"><?php wp_nonce_field('hrim_regenerate_pages'); ?><div><span class="hrim-settings-action-title">Regenerate Pages</span></div><button class="hrim-secondary">Run</button></form>
-              <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner onsubmit="return confirm('Install the detailed hotel section and checkpoint library? Existing sections and checkpoints will not be duplicated or removed.');"><input type="hidden" name="action" value="hrim_install_checklist_library"><?php wp_nonce_field('hrim_install_checklist_library'); ?><div><span class="hrim-settings-action-title">Install Checklist Library</span></div><button class="hrim-primary">Install Library</button></form>
+              <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner <?php if(!$library_installed): ?>onsubmit="return confirm('Install the detailed hotel section and checkpoint library?');"<?php endif; ?>><input type="hidden" name="action" value="hrim_install_checklist_library"><?php wp_nonce_field('hrim_install_checklist_library'); ?><div><span class="hrim-settings-action-title">Install Checklist Library</span></div><button class="hrim-primary" type="submit" <?php disabled($library_installed,true); ?>><?php echo $library_installed?'Installed':'Install Library'; ?></button></form>
             </div>
           </div>
-          <div class="hrim-panel hrim-settings-wide"><div class="hrim-panel-head"><div><h2>Maintenance</h2></div></div>
-            <form class="hrim-maintenance-row" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-no-spinner><input type="hidden" name="action" value="hrim_repair_application"><?php wp_nonce_field('hrim_repair_application'); ?><div><span class="hrim-settings-action-title">Repair Application</span></div><button class="hrim-secondary">Repair Now</button></form>
-          </div>
-
-        </div><?php return $this->shell('Settings',ob_get_clean(),'settings');
+        </div>
+        <script>
+        (function(){
+          var form=document.getElementById('hrimGeneralSettingsForm');
+          var save=document.getElementById('hrimSaveSettingsButton');
+          if(!form||!save)return;
+          function snapshot(){
+            var parts=[];
+            form.querySelectorAll('input,select,textarea').forEach(function(el){
+              if(!el.name||el.disabled)return;
+              if(el.type==='hidden'||el.type==='submit'||el.type==='button'||el.type==='file')return;
+              if(el.type==='checkbox'||el.type==='radio') parts.push(el.name+'='+(el.checked?'1':'0'));
+              else parts.push(el.name+'='+el.value);
+            });
+            return parts.join('&');
+          }
+          var initial=snapshot();
+          function sync(){
+            var fileChanged=false;
+            form.querySelectorAll('input[type="file"]').forEach(function(el){if(el.files&&el.files.length)fileChanged=true;});
+            save.disabled=(!fileChanged && snapshot()===initial);
+          }
+          form.addEventListener('input',sync);
+          form.addEventListener('change',sync);
+          sync();
+        })();
+        </script>
+        <?php return $this->shell('Settings',ob_get_clean(),'settings');
     }
 
     public function communications_shortcode(){
@@ -2778,11 +4007,18 @@ Assets:
               <button type="submit" form="hrimMetaSettingsForm" class="hrim-primary">Save Meta Settings</button>
             </div>
           </div>
-          <?php $tg=$this->telegram_settings(); $nr=$this->notification_rules(); $last_run=get_option('hrim_notifications_last_run','Never'); ?>
+          <?php $mas=$this->message_auto_sender_settings(); $tg=$this->telegram_settings(); $nr=$this->notification_rules(); $last_run=get_option('hrim_notifications_last_run','Never'); ?>
+          <div class="hrim-panel hrim-settings-wide"><div class="hrim-panel-head"><div><h2 class="hrim-communications-section-title">Message Auto Sender</h2></div></div>
+            <form id="hrimMasSettingsForm" class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_notification_settings"><?php wp_nonce_field('hrim_save_notification_settings'); ?><input type="hidden" name="settings_section" value="message_auto_sender">
+              <label class="hrim-checkbox-row"><input type="checkbox" name="mas_enabled" value="1" <?php checked($mas['enabled']); ?>><span>Enable Message Auto Sender WhatsApp Group</span></label>
+              <div class="hrim-grid-2"><label>User ID<input name="mas_user_id" value="<?php echo esc_attr($mas['user_id']); ?>"></label><label>Password<input type="password" name="mas_password" value="" autocomplete="new-password" placeholder="Leave blank to keep saved password"></label><label>WhatsApp Group ID<input name="mas_group_id" value="<?php echo esc_attr($mas['group_id']); ?>"></label></div>
+              <div class="hrim-form-actions"><button class="hrim-primary" type="submit">Save Message Auto Sender</button></div>
+            </form>
+          </div>
           <div class="hrim-panel hrim-settings-wide"><div class="hrim-panel-head"><div><h2 class="hrim-communications-section-title">Telegram Settings</h2></div></div>
             <form id="hrimTelegramSettingsForm" class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_notification_settings"><?php wp_nonce_field('hrim_save_notification_settings'); ?><input type="hidden" name="settings_section" value="telegram">
               <label class="hrim-checkbox-row"><input type="checkbox" name="telegram_enabled" value="1" <?php checked($tg['enabled']); ?>><span>Enable Telegram notifications</span></label>
-              <div class="hrim-grid-2"><label>Telegram Bot Token<input type="password" name="telegram_bot_token" value="<?php echo esc_attr($tg['bot_token']); ?>" autocomplete="new-password"></label><label>Test Telegram Chat ID<input name="telegram_test_chat_id" value="<?php echo esc_attr($tg['test_chat_id']); ?>"></label></div>
+              <div class="hrim-grid-2"><label>Telegram Bot Token<input type="password" name="telegram_bot_token" value="<?php echo esc_attr($tg['bot_token']); ?>" autocomplete="new-password"></label><label>Telegram Group / Chat ID<input name="telegram_group_chat_id" value="<?php echo esc_attr($tg['group_chat_id']); ?>"></label><label>Test Telegram Chat ID<input name="telegram_test_chat_id" value="<?php echo esc_attr($tg['test_chat_id']); ?>"></label></div>
             </form>
             <div class="hrim-communication-button-row">
               <form class="hrim-inline-action-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_test_telegram"><?php wp_nonce_field('hrim_test_telegram'); ?><button class="hrim-secondary">Send Test</button></form>
@@ -2792,23 +4028,24 @@ Assets:
           <div class="hrim-panel hrim-settings-wide"><div class="hrim-panel-head"><div><h2 class="hrim-communications-section-title">Notification Rules & Triggers</h2></div></div>
             <form id="hrimNotificationRulesForm" class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_save_notification_settings"><?php wp_nonce_field('hrim_save_notification_settings'); ?><input type="hidden" name="settings_section" value="rules">
               <label class="hrim-checkbox-row"><input type="checkbox" name="notifications_enabled" value="1" <?php checked(get_option('hrim_notifications_enabled','0'),'1'); ?>><span>Enable scheduled notification engine</span></label>
-              <div class="hrim-table-wrap"><table class="hrim-table hrim-notification-rule-table"><thead><tr><th>Notification</th><th>Active</th><th>Interval Minutes</th><th>Days Before</th><th>Head Number</th><th>Telegram Group</th></tr></thead><tbody>
-              <?php foreach(['pending_issues'=>'Pending Issues List','upcoming_periodic'=>'Upcoming Periodic Checks','scheduled_not_started'=>'Scheduled Tasks Not Yet Started','scheduled_in_progress'=>'Scheduled Tasks In Progress'] as $key=>$label): $rule=$nr[$key]; ?><tr><td><?php echo esc_html($label); ?></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][enabled]" value="1" <?php checked(!empty($rule['enabled'])); ?>></td><td><input type="number" min="5" name="rules[<?php echo esc_attr($key); ?>][interval_minutes]" value="<?php echo esc_attr($rule['interval_minutes']); ?>"></td><td><?php if($key==='upcoming_periodic'): ?><input type="number" min="0" name="rules[<?php echo esc_attr($key); ?>][days_before]" value="<?php echo esc_attr($rule['days_before']); ?>"><?php else: ?>—<?php endif; ?></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][head]" value="1" <?php checked(!empty($rule['head'])); ?>></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][telegram]" value="1" <?php checked(!empty($rule['telegram'])); ?>></td></tr><?php endforeach; ?>
+              <p class="hrim-subtext">Issue Created, Issue Updated and Supervision Updated are sent immediately. Only the two reminders below are time based.</p>
+              <div class="hrim-table-wrap"><table class="hrim-table hrim-notification-rule-table"><thead><tr><th>Notification</th><th>Active</th><th>Start Time</th><th>Interval Minutes</th><th>Message Auto Sender WhatsApp Group</th><th>Telegram Group</th></tr></thead><tbody>
+              <?php foreach(['unresolved_issues'=>'Unresolved Issues Reminder','pending_supervision'=>'Pending Supervision Reminder'] as $key=>$label): $rule=$nr[$key]; ?><tr><td><?php echo esc_html($label); ?></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][enabled]" value="1" <?php checked(!empty($rule['enabled'])); ?>></td><td><input type="time" name="rules[<?php echo esc_attr($key); ?>][start_time]" value="<?php echo esc_attr($rule['start_time']); ?>"></td><td><input type="number" min="0" step="1" name="rules[<?php echo esc_attr($key); ?>][interval_minutes]" value="<?php echo esc_attr($rule['interval_minutes']); ?>"><small>180 = every 3 hours; 0 = once daily</small></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][message_auto_sender]" value="1" <?php checked(!empty($rule['message_auto_sender'])); ?>></td><td><input type="checkbox" name="rules[<?php echo esc_attr($key); ?>][telegram]" value="1" <?php checked(!empty($rule['telegram'])); ?>></td></tr><?php endforeach; ?>
               </tbody></table></div></form>
             <div class="hrim-communication-button-row">
               <form class="hrim-inline-action-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_run_notifications_now"><?php wp_nonce_field('hrim_run_notifications_now'); ?><button class="hrim-secondary">Run Now</button></form>
               <button type="submit" form="hrimNotificationRulesForm" class="hrim-primary">Save Notification Rules</button>
             </div>
           </div>
-          <?php global $wpdb; $notification_logs=$wpdb->get_results("SELECT l.*,d.name department_name FROM {$wpdb->prefix}hrim_notification_log l LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=l.department_id WHERE l.channel<>'whatsapp_group' ORDER BY l.id DESC LIMIT 100"); ?>
+          <?php global $wpdb; $this->trim_notification_logs(20); $notification_logs=$wpdb->get_results("SELECT l.*,d.name department_name FROM {$wpdb->prefix}hrim_notification_log l LEFT JOIN {$wpdb->prefix}hrim_departments d ON d.id=l.department_id WHERE l.channel<>'whatsapp_group' ORDER BY l.id DESC LIMIT 20"); ?>
           <div class="hrim-panel hrim-settings-wide"><div class="hrim-panel-head"><div><h2 class="hrim-communications-section-title">Notification Log</h2></div></div><div class="hrim-table-wrap"><table class="hrim-table"><thead><tr><th>Date</th><th>Department</th><th>Notification</th><th>Channel</th><th>Destination</th><th>Status</th><th>Response</th></tr></thead><tbody><?php foreach($notification_logs as $log): ?><tr><td><?php echo esc_html($this->ist_date('d/m/y h:i A',$log->created_at)); ?></td><td><?php echo esc_html($log->department_name?:'—'); ?></td><td><?php echo esc_html(ucwords(str_replace('_',' ',$log->notification_type))); ?></td><td><?php echo esc_html(ucwords(str_replace('_',' ',$log->channel))); ?></td><td><?php echo esc_html($log->destination?:'—'); ?></td><td><span class="hrim-badge <?php echo $log->status==='sent'?'success':'high'; ?>"><?php echo esc_html(ucfirst($log->status)); ?></span></td><td><?php echo esc_html($log->api_response?:'—'); ?></td></tr><?php endforeach; ?><?php if(!$notification_logs): ?><tr><td colspan="7" class="hrim-empty">No notification activity yet.</td></tr><?php endif; ?></tbody></table></div></div>
 
         </div><?php return $this->shell('Communications',ob_get_clean(),'communications');
     }
 
-    private function inspection_table($rows){ $single_property=$this->single_active_property();
+    private function inspection_table($rows,$show_sl=true,$dashboard_order=false){ $single_property=$this->single_active_property();
         global $wpdb;
-        ob_start(); ?><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><th>Sl.</th><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Floor</th><th>Room</th><th>Inspector</th><th>Time</th><th class="hrim-no-export">Actions</th></tr></thead><tbody><?php if(!$rows): ?><tr><td colspan="<?php echo $single_property?8:9; ?>" class="hrim-empty">No records found.</td></tr><?php endif; $sl=0; foreach($rows as $r): ?><tr><td><?php echo ++$sl; ?></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->submitted_at)); ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><strong><?php echo esc_html($r->room_no); ?></strong></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($this->ist_date('h:i A',$r->submitted_at)); ?></td><td class="hrim-no-export"><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-view hrim-view-inspection" data-target="hrimInspectionModal<?php echo esc_attr($r->id); ?>" title="View Inspection Details" aria-label="View Inspection Details"><span class="hrim-eye-symbol" aria-hidden="true">&#128065;</span></button><?php if($this->can_manage()): ?><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this inspection and all linked answers/issues?');"><input type="hidden" name="action" value="hrim_delete_inspection"><input type="hidden" name="id" value="<?php echo esc_attr($r->id); ?>"><?php wp_nonce_field('hrim_delete_inspection'); ?><button class="hrim-icon-btn hrim-delete" title="Delete"><span class="dashicons dashicons-trash"></span></button></form><?php endif; ?></div></td></tr><?php endforeach; ?></tbody></table></div><?php
+        ob_start(); ?><div class="hrim-table-wrap"><table class="hrim-table hrim-exportable"><thead><tr><?php if($show_sl): ?><th>Sl.</th><?php endif; ?><?php if($dashboard_order): ?><th>Floor</th><th>Asset</th><th>Date</th><th>Inspector</th><th>Time</th><?php else: ?><th>Date</th><?php if(!$single_property): ?><th>Hotel</th><?php endif; ?><th>Floor</th><th>Room</th><th>Inspector</th><th>Time</th><?php endif; ?><th class="hrim-no-export">Actions</th></tr></thead><tbody><?php if(!$rows): ?><tr><td colspan="<?php echo ($single_property?7:8)+($show_sl?1:0); ?>" class="hrim-empty">No records found.</td></tr><?php endif; $sl=0; foreach($rows as $r): ?><tr><?php if($show_sl): ?><td><?php echo ++$sl; ?></td><?php endif; ?><?php if($dashboard_order): ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><strong><?php echo esc_html($r->room_no); ?></strong></td><td><?php echo esc_html($this->ist_date('d/m/y',$r->submitted_at)); ?></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($this->ist_date('h:i A',$r->submitted_at)); ?></td><?php else: ?><td><?php echo esc_html($this->ist_date('d/m/y',$r->submitted_at)); ?></td><?php if(!$single_property): ?><td><?php echo esc_html($r->hotel_name); ?></td><?php endif; ?><td><?php echo esc_html($r->floor_name?:'—'); ?></td><td><strong><?php echo esc_html($r->room_no); ?></strong></td><td><?php echo esc_html($r->inspector); ?></td><td><?php echo esc_html($this->ist_date('h:i A',$r->submitted_at)); ?></td><?php endif; ?><td class="hrim-no-export"><div class="hrim-actions"><button type="button" class="hrim-icon-btn hrim-action-view hrim-view-inspection" data-target="hrimInspectionModal<?php echo esc_attr($r->id); ?>" title="View Inspection Details" aria-label="View Inspection Details"><span class="dashicons dashicons-visibility" aria-hidden="true"></span></button><?php if($this->can_manage()): ?><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Delete this inspection and all linked answers/issues?');"><input type="hidden" name="action" value="hrim_delete_inspection"><input type="hidden" name="id" value="<?php echo esc_attr($r->id); ?>"><?php wp_nonce_field('hrim_delete_inspection'); ?><button class="hrim-icon-btn hrim-delete" title="Delete"><span class="dashicons dashicons-trash"></span></button></form><?php endif; ?></div></td></tr><?php endforeach; ?></tbody></table></div><?php
         foreach($rows as $r){
             $answers=$wpdb->get_results($wpdb->prepare("SELECT a.*,q.question,s.name section_name,s.sort_order section_order FROM {$wpdb->prefix}hrim_answers a LEFT JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id LEFT JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE a.inspection_id=%d ORDER BY COALESCE(s.sort_order,9999),s.name,q.sort_order,q.id",$r->id));
             $issues=$wpdb->get_results($wpdb->prepare("SELECT id,title,description,status,created_at FROM {$wpdb->prefix}hrim_issues WHERE inspection_id=%d ORDER BY id",$r->id));
@@ -2832,17 +4069,20 @@ Assets:
         return '<div class="hrim-alert '.$cls.' hrim-form-alert">'.esc_html(wp_unslash($_GET['hrim_msg'])).'</div>';
     }
 
-    private function add_issue_modal($hotels,$floors,$rooms,$departments,$sections,$users,$open=false){
+    private function add_issue_modal($hotels,$floors,$rooms,$departments,$sections,$users,$open=false,$direct=false){
         $single_property=$this->single_active_property();
         ob_start(); ?>
         <?php $open=$open || sanitize_key(wp_unslash($_GET['hrim_form']??''))==='add'; ?>
         <div class="hrim-modal <?php echo $open?'open':''; ?>" id="hrimAddIssueModal">
             <div class="hrim-modal-card hrim-modal-wide">
-                <a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-issues')); ?>" aria-label="Close" title="Close">×</a>
-                <h2>Add Manual Issue</h2>
+                <div class="hrim-add-issue-head<?php echo $direct?' is-standalone':''; ?>">
+                    <h2>Add Issue</h2>
+                    <a class="hrim-modal-close" href="<?php echo esc_url($this->page_url('hotel-inspection-issues')); ?>" aria-label="Close" title="Close">×</a>
+                </div>
                 <?php echo $this->issue_form_alert('add'); ?>
                 <form id="hrimAddIssueForm" class="hrim-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                     <input type="hidden" name="action" value="hrim_save_issue">
+                    <?php if($direct): ?><input type="hidden" name="direct_issue" value="1"><?php endif; ?>
                     <?php wp_nonce_field('hrim_save_issue'); ?>
                     <div class="hrim-grid-2">
                         <?php if($single_property): ?><input type="hidden" name="hotel_id" id="hrimIssueHotel" value="<?php echo esc_attr($single_property->id); ?>"><?php else: ?><label>Property *
@@ -2851,36 +4091,36 @@ Assets:
                                 <?php foreach($hotels as $h): ?><option value="<?php echo esc_attr($h->id); ?>"><?php echo esc_html($h->name); ?></option><?php endforeach; ?>
                             </select>
                         </label><?php endif; ?>
-                        <label>Floor
-                            <select name="floor_id" id="hrimIssueFloor">
+                        <label>Floor *
+                            <select name="floor_id" id="hrimIssueFloor" required>
                                 <option value="">Select Floor</option>
                                 <?php foreach($floors as $f): ?><option value="<?php echo esc_attr($f->id); ?>" data-hotel="<?php echo esc_attr($f->hotel_id); ?>"><?php echo esc_html($f->name); ?></option><?php endforeach; ?>
                             </select>
                         </label>
-                        <label>Room
-                            <select name="room_id" id="hrimIssueRoom">
-                                <option value="">Select Room</option>
+                        <label>Asset<?php echo $direct?' *':''; ?>
+                            <select name="room_id" id="hrimIssueRoom" <?php echo $direct?'required disabled':'disabled'; ?> aria-disabled="true">
+                                <option value="">Select</option>
                                 <?php foreach($rooms as $r): ?><option value="<?php echo esc_attr($r->id); ?>" data-hotel="<?php echo esc_attr($r->hotel_id); ?>" data-floor="<?php echo esc_attr($r->floor_id); ?>"><?php echo esc_html($r->room_no); ?></option><?php endforeach; ?>
                             </select>
                         </label>
                         <label>Department *
                             <select name="department_id" id="hrimIssueDepartment" required>
                                 <option value="">Select Department</option>
-                                <?php foreach($departments as $department): ?><option value="<?php echo esc_attr($department->id); ?>"><?php echo esc_html($department->name); ?></option><?php endforeach; ?>
+                                <?php foreach($departments as $department): ?><option value="<?php echo esc_attr($department->id); ?>" data-head-id="<?php echo esc_attr((int)($department->department_head_user_id??0)); ?>" data-head-name="<?php echo esc_attr($department->department_head_name??''); ?>"><?php echo esc_html($department->name); ?></option><?php endforeach; ?>
                             </select>
                         </label>
-                        <label>Section
+                        <?php if(!$direct): ?><label>Section
                             <select name="section_id" id="hrimIssueSection">
                                 <option value="">Select Section</option>
                                 <?php foreach($sections as $se): ?><option value="<?php echo esc_attr($se->id); ?>" data-department="<?php echo esc_attr($se->department_id); ?>"><?php echo esc_html($se->name); ?></option><?php endforeach; ?>
                             </select>
-                        </label>
+                        </label><?php else: ?><input type="hidden" name="section_id" value=""><?php endif; ?>
                         <label>Issue Title *<input name="title" required maxlength="255"></label>
                         
                         <label>Assign To
-                            <select name="assigned_to"><option value="">Unassigned</option><?php foreach($users as $u): $user_depts=$this->user_department_ids($u->ID); ?><option value="<?php echo esc_attr($u->ID); ?>" data-departments="<?php echo esc_attr(implode(',',$user_depts)); ?>" data-global="<?php echo $this->is_global_department_user($u->ID)?'1':'0'; ?>"><?php echo esc_html($u->display_name); ?></option><?php endforeach; ?></select>
+                            <input type="text" id="hrimIssueAssignedHead" value="Select Department first" readonly aria-readonly="true">
+                            <input type="hidden" name="assigned_to" id="hrimIssueAssignedTo" value="">
                         </label>
-                        <label>Due Date<input type="date" name="due_date"></label>
                     </div>
                     <label>Issue Description *<textarea name="description" required></textarea></label>
                     <label>Before Photographs<input type="file" name="issue_photos[]" accept="image/*" multiple></label>
@@ -2893,7 +4133,7 @@ Assets:
 
     private function assign_issue_modal($users){ $open=sanitize_key(wp_unslash($_GET['hrim_form']??''))==='assign'; ob_start(); ?><div class="hrim-modal <?php echo $open?'open':''; ?>" id="hrimAssignIssueModal"><div class="hrim-modal-card"><button class="hrim-modal-close" type="button">×</button><h2>Assign Issue</h2><?php echo $this->issue_form_alert('assign'); ?><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_assign_issue"><input type="hidden" name="issue_id" id="hrimAssignIssueId" value="<?php echo esc_attr(absint($_GET['hrim_issue_id']??0)); ?>"><?php wp_nonce_field('hrim_assign_issue'); ?><label>Assigned To *<select name="assigned_to" id="hrimAssignIssueUser" required><option value="">Select Staff Member</option><?php foreach($users as $u): $user_depts=$this->user_department_ids($u->ID); ?><option value="<?php echo esc_attr($u->ID); ?>" data-departments="<?php echo esc_attr(implode(',',$user_depts)); ?>" data-global="<?php echo $this->is_global_department_user($u->ID)?'1':'0'; ?>"><?php echo esc_html($u->display_name); ?></option><?php endforeach; ?></select></label><label>Due Date<input type="date" name="due_date" id="hrimAssignIssueDue"></label><label>Assignment Remarks<textarea name="assignment_remarks" id="hrimAssignIssueRemarks" placeholder="Optional assignment instructions"></textarea></label><div class="hrim-form-actions"><button class="hrim-primary">Assign Issue</button></div></form></div></div><?php return ob_get_clean(); }
 
-    private function edit_issue_modal(){ $open=sanitize_key(wp_unslash($_GET['hrim_form']??''))==='edit'; ob_start(); ?><div class="hrim-modal <?php echo $open?'open':''; ?>" id="hrimEditIssueModal"><div class="hrim-modal-card"><button class="hrim-modal-close" type="button">×</button><h2>Edit Issue</h2><?php echo $this->issue_form_alert('edit'); ?><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_update_issue"><input type="hidden" name="issue_id" id="hrimEditIssueId" value="<?php echo esc_attr(absint($_GET['hrim_issue_id']??0)); ?>"><?php wp_nonce_field('hrim_update_issue'); ?><label>Issue Title *<input name="title" id="hrimEditIssueTitle" required></label><label>Remarks / Description *<textarea name="description" id="hrimEditIssueDescription" required></textarea></label><label>Due Date<input type="date" name="due_date" id="hrimEditIssueDue"></label><div class="hrim-form-actions"><button class="hrim-primary">Update Issue</button></div></form></div></div><?php return ob_get_clean(); }
+    private function edit_issue_modal(){ $open=sanitize_key(wp_unslash($_GET['hrim_form']??''))==='edit'; ob_start(); ?><div class="hrim-modal <?php echo $open?'open':''; ?>" id="hrimEditIssueModal"><div class="hrim-modal-card"><button class="hrim-modal-close" type="button">×</button><h2>Edit Issue</h2><?php echo $this->issue_form_alert('edit'); ?><form class="hrim-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="hrim_update_issue"><input type="hidden" name="issue_id" id="hrimEditIssueId" value="<?php echo esc_attr(absint($_GET['hrim_issue_id']??0)); ?>"><?php wp_nonce_field('hrim_update_issue'); ?><label>Issue Title *<input name="title" id="hrimEditIssueTitle" required></label><label>Remarks / Description *<textarea name="description" id="hrimEditIssueDescription" required></textarea></label><div class="hrim-form-actions"><button class="hrim-primary">Update Issue</button></div></form></div></div><?php return ob_get_clean(); }
 
     private function progress_issue_modal(){ $open=sanitize_key(wp_unslash($_GET['hrim_form']??''))==='progress'; ob_start(); ?>
         <div class="hrim-modal <?php echo $open?'open':''; ?>" id="hrimProgressIssueModal">
@@ -2920,14 +4160,14 @@ Assets:
                     <div class="hrim-update-issue-row">
                         <label>Status *
                             <select name="status" id="hrimProgressIssueStatus" required>
+                                <option value="resolved" selected>Resolved</option>
                                 <option value="in_progress">In Progress</option>
-                                <option value="resolved">Resolved</option>
                             </select>
                         </label>
                         <label>Update Photo<input type="file" name="update_photos[]" accept="image/*" multiple></label>
                     </div>
                     <label>Remarks *<textarea name="remarks" id="hrimProgressIssueRemarks" required placeholder="Describe the work completed or current progress"></textarea></label>
-                    <div class="hrim-form-actions"><button class="hrim-primary">Save Update</button></div>
+                    <div class="hrim-form-actions"><button class="hrim-primary">Update Issue</button></div>
                 </form>
             </div>
         </div>
@@ -2983,6 +4223,32 @@ Assets:
         $this->guard_manage('hrim_delete_room_category'); global $wpdb; $id=absint($_POST['id']??0);
         $count=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_rooms WHERE category_id=%d",$id)); if($count)$this->dependency_error('hotel-inspection-room-categories',sprintf('Cannot delete this category because %d room(s) are linked to it.',$count));
         $wpdb->delete($wpdb->prefix.'hrim_category_templates',['category_id'=>$id]); $deleted=$wpdb->delete($wpdb->prefix.'hrim_room_categories',['id'=>$id]); if($deleted)$this->audit('Room Categories','delete',$id); $this->save_result($deleted,'hotel-inspection-room-categories','Room category deleted successfully.');
+    }
+
+    public function ajax_update_asset_type_sort(){
+        check_ajax_referer('hrim_ajax','nonce');
+        if(!$this->can_manage()) wp_send_json_error(['message'=>'Permission denied.'],403);
+        global $wpdb;
+        $id=absint($_POST['id']??0);
+        $sort_order=intval($_POST['sort_order']??0);
+        if(!$id || !$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_asset_types WHERE id=%d",$id))) wp_send_json_error(['message'=>'Asset Type not found.'],404);
+        $result=$wpdb->update($wpdb->prefix.'hrim_asset_types',['sort_order'=>$sort_order],['id'=>$id],['%d'],['%d']);
+        if($result===false) wp_send_json_error(['message'=>'Could not save Sort Order.'],500);
+        $this->audit('Asset Types','update',$id,['sort_order'=>$sort_order]);
+        wp_send_json_success(['sort_order'=>$sort_order,'message'=>'Saved']);
+    }
+
+    public function ajax_update_floor_sort(){
+        check_ajax_referer('hrim_ajax','nonce');
+        if(!$this->can_manage()) wp_send_json_error(['message'=>'Permission denied.'],403);
+        global $wpdb;
+        $id=absint($_POST['id']??0);
+        $sort_order=intval($_POST['sort_order']??0);
+        if(!$id || !$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_floors WHERE id=%d",$id))) wp_send_json_error(['message'=>'Floor not found.'],404);
+        $result=$wpdb->update($wpdb->prefix.'hrim_floors',['sort_order'=>$sort_order],['id'=>$id],['%d'],['%d']);
+        if($result===false) wp_send_json_error(['message'=>'Could not save Sort Order.'],500);
+        $this->audit('Floors','update',$id,['sort_order'=>$sort_order]);
+        wp_send_json_success(['sort_order'=>$sort_order,'message'=>'Saved']);
     }
 
     public function save_asset_type(){
@@ -3044,29 +4310,30 @@ Assets:
         $data=['hotel_id'=>$hotel,'floor_id'=>$floor,'asset_type_id'=>$asset_type_id,'category_id'=>null,'category'=>'','template_id'=>null,'room_no'=>sanitize_text_field(wp_unslash($_POST['room_no']??'')),'status'=>($_POST['status']??'active')==='inactive'?'inactive':'active'];
         $dup=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_rooms WHERE hotel_id=%d AND room_no=%s AND id<>%d",$hotel,$data['room_no'],$id)); if($dup)$this->dependency_error('hotel-inspection-rooms','This asset name or number already exists for the selected property.');
         $r=$id?$wpdb->update($wpdb->prefix.'hrim_rooms',$data,['id'=>$id]):$wpdb->insert($wpdb->prefix.'hrim_rooms',$data); if($r===false)$this->save_result(false,'hotel-inspection-rooms',''); if(!$id)$id=(int)$wpdb->insert_id;
-        $selected=array_values(array_unique(array_filter(array_map('absint',(array)($_POST['template_ids']??[])))));
+        $selected=array_values(array_unique(array_filter(array_map('absint',(array)($_POST['section_ids']??[])))));
         $valid=[];
-        foreach($selected as $tid){ if($wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_templates WHERE id=%d AND status='active'",$tid)))$valid[]=$tid; }
-        $direct=$valid;
-        $excluded=[];
-        $wpdb->delete($wpdb->prefix.'hrim_room_templates',['room_id'=>$id]);
-        $wpdb->delete($wpdb->prefix.'hrim_room_template_exclusions',['room_id'=>$id]);
-        foreach($direct as $tid)$wpdb->insert($wpdb->prefix.'hrim_room_templates',['room_id'=>$id,'template_id'=>$tid]);
-        foreach($excluded as $tid)$wpdb->insert($wpdb->prefix.'hrim_room_template_exclusions',['room_id'=>$id,'template_id'=>$tid]);
+        foreach($selected as $sid){ if($wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE id=%d AND status='active'",$sid)))$valid[]=$sid; }
+        if(!$valid)$this->dependency_error('hotel-inspection-rooms','Please select at least one active section.');
+        $wpdb->delete($wpdb->prefix.'hrim_room_sections',['room_id'=>$id]);
+        foreach($valid as $order=>$sid)$wpdb->insert($wpdb->prefix.'hrim_room_sections',['room_id'=>$id,'section_id'=>$sid,'sort_order'=>$order+1]);
 
         // Save checkpoint visibility for this asset. Checked checkpoints are shown;
         // unchecked checkpoints are stored as asset-level exclusions.
         $included_questions=array_values(array_unique(array_filter(array_map('absint',(array)($_POST['included_question_ids']??[])))));
+        $managed_questions=array_values(array_unique(array_filter(array_map('absint',(array)($_POST['managed_question_ids']??[])))));
         $available_question_ids=[];
         if($valid){
             $ph=implode(',',array_fill(0,count($valid),'%d'));
-            $available_question_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT DISTINCT q.id FROM {$wpdb->prefix}hrim_template_sections ts INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=ts.section_id AND q.is_library=1 WHERE ts.template_id IN ($ph)",$valid)));
+            $available_question_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_questions WHERE is_library=1 AND section_id IN ($ph)",$valid)));
         }
-        $included_questions=array_values(array_intersect($available_question_ids,$included_questions));
-        $excluded_questions=array_values(array_diff($available_question_ids,$included_questions));
-        $wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id]);
-        foreach($excluded_questions as $qid){
-            $wpdb->insert($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id,'question_id'=>$qid]);
+        $managed_questions=array_values(array_intersect($available_question_ids,$managed_questions));
+        $included_questions=array_values(array_intersect($managed_questions,$included_questions));
+        $excluded_questions=array_values(array_diff($managed_questions,$included_questions));
+        if(isset($_POST['hrim_manage_additional_checkpoints'])){
+            foreach($managed_questions as $qid)$wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id,'question_id'=>$qid]);
+            foreach($excluded_questions as $qid){
+                $wpdb->insert($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id,'question_id'=>$qid]);
+            }
         }
 
         // The Additional Asset Checkpoints editor has been removed. Preserve any historical
@@ -3078,11 +4345,9 @@ Assets:
         $aids=(array)($_POST['additional_id']??[]); $asids=(array)($_POST['additional_section_id']??[]); $aqs=(array)($_POST['additional_question']??[]);
         foreach($aqs as $i=>$raw_question){
             $question=trim(sanitize_text_field(wp_unslash($raw_question))); if($question==='') continue;
-            $section_id=absint($asids[$i]??0); if(!$section_id || !$valid) continue;
+            $section_id=absint($asids[$i]??0); if(!$section_id || !in_array($section_id,$valid,true)) continue;
             $section=$wpdb->get_row($wpdb->prepare("SELECT id,name FROM {$wpdb->prefix}hrim_sections WHERE id=%d AND status='active'",$section_id)); if(!$section) continue;
-            $ph=implode(',',array_fill(0,count($valid),'%d'));
-            $template_id=(int)$wpdb->get_var($wpdb->prepare("SELECT ts.template_id FROM {$wpdb->prefix}hrim_template_sections ts WHERE ts.section_id=%d AND ts.template_id IN ($ph) ORDER BY FIELD(ts.template_id,$ph) LIMIT 1",array_merge([$section_id],$valid,$valid)));
-            if(!$template_id) continue;
+            $template_id=0; // retained only as a legacy database column
             $type='yes_no'; $required=0; $sort_order=0; $addition_id=absint($aids[$i]??0);
             $qdata=['template_id'=>$template_id,'section_id'=>$section_id,'section_name'=>$section->name,'question'=>$question,'question_type'=>$type,'required_flag'=>$required,'is_library'=>0,'sort_order'=>$sort_order];
             if($addition_id && isset($existing_map[$addition_id])){
@@ -3100,10 +4365,10 @@ Assets:
         }
         }
 
-        $this->audit('Assets',$id?'update':'create',$id,['selected_templates'=>$valid,'direct_templates'=>$direct,'excluded_category_templates'=>$excluded,'excluded_questions'=>$excluded_questions]);
+        $this->audit('Assets',$id?'update':'create',$id,['section_ids'=>$valid,'excluded_questions'=>$excluded_questions]);
         $this->back('hotel-inspection-rooms','saved','Asset saved successfully.');
     }
-    public function delete_room(){ $this->guard_manage('hrim_delete_room'); global $wpdb; $id=absint($_POST['id']); $deps=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_inspections WHERE room_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues WHERE room_id=%d)",$id,$id)); if($deps)$this->dependency_error('hotel-inspection-rooms','Cannot delete this asset because inspections or issues are linked to it.'); $addition_qids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT question_id FROM {$wpdb->prefix}hrim_room_question_additions WHERE room_id=%d",$id))); $wpdb->delete($wpdb->prefix.'hrim_room_templates',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_template_exclusions',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_question_additions',['room_id'=>$id]); foreach($addition_qids as $qid)$wpdb->delete($wpdb->prefix.'hrim_questions',['id'=>$qid,'is_library'=>0]); $this->save_result($wpdb->delete($wpdb->prefix.'hrim_rooms',['id'=>$id]),'hotel-inspection-rooms','Asset deleted successfully.'); }
+    public function delete_room(){ $this->guard_manage('hrim_delete_room'); global $wpdb; $id=absint($_POST['id']); $deps=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_inspections WHERE room_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues WHERE room_id=%d)",$id,$id)); if($deps)$this->dependency_error('hotel-inspection-rooms','Cannot delete this asset because inspections or issues are linked to it.'); $addition_qids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT question_id FROM {$wpdb->prefix}hrim_room_question_additions WHERE room_id=%d",$id))); $wpdb->delete($wpdb->prefix.'hrim_room_sections',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_templates',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_template_exclusions',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['room_id'=>$id]); $wpdb->delete($wpdb->prefix.'hrim_room_question_additions',['room_id'=>$id]); foreach($addition_qids as $qid)$wpdb->delete($wpdb->prefix.'hrim_questions',['id'=>$qid,'is_library'=>0]); $this->save_result($wpdb->delete($wpdb->prefix.'hrim_rooms',['id'=>$id]),'hotel-inspection-rooms','Asset deleted successfully.'); }
 
     public function save_department(){
         $this->guard_manage('hrim_save_department'); global $wpdb;
@@ -3113,6 +4378,7 @@ Assets:
         $dup=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_departments WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND id<>%d LIMIT 1",$name,$id));
         if($dup) $this->dependency_error('hotel-inspection-departments','A department with this name already exists.');
         $head_user_id=absint($_POST['department_head_user_id']??0);
+        if(!$head_user_id) $this->dependency_error('hotel-inspection-departments','Department Head is required.');
         if($head_user_id && !get_userdata($head_user_id)) $this->dependency_error('hotel-inspection-departments','Selected Department Head was not found.');
         if($head_user_id && !$this->normalize_mobile_number(get_user_meta($head_user_id,'hrim_mobile',true))) $this->dependency_error('hotel-inspection-departments','The selected Department Head does not have a mobile number.');
         $data=['name'=>$name,'department_head_user_id'=>$head_user_id?:null,'telegram_chat_id'=>sanitize_text_field(wp_unslash($_POST['telegram_chat_id']??'')),'notify_head_enabled'=>isset($_POST['notify_head_enabled'])?1:0,'notify_telegram_enabled'=>isset($_POST['notify_telegram_enabled'])?1:0,'description'=>sanitize_textarea_field(wp_unslash($_POST['description']??''))];
@@ -3139,17 +4405,38 @@ Assets:
         if(!$name) $this->dependency_error('hotel-inspection-checklist-sections','Section name is required.');
         $dup=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) AND id<>%d LIMIT 1",$name,$id));
         if($dup) $this->dependency_error('hotel-inspection-checklist-sections','A checklist section with this name already exists.');
-        $department_id=absint($_POST['department_id']??0); if(!$department_id || !(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_departments WHERE id=%d AND status='active'",$department_id))) $this->dependency_error('hotel-inspection-checklist-sections','Please select a valid active department.');
-        $data=['name'=>$name,'department_id'=>$department_id,'description'=>sanitize_textarea_field(wp_unslash($_POST['description']??'')),'sort_order'=>intval($_POST['sort_order']??0),'status'=>($_POST['status']??'active')==='inactive'?'inactive':'active'];
+        $data=['name'=>$name,'department_id'=>null,'description'=>sanitize_textarea_field(wp_unslash($_POST['description']??'')),'sort_order'=>intval($_POST['sort_order']??0),'status'=>($_POST['status']??'active')==='inactive'?'inactive':'active'];
         $r=$id?$wpdb->update($wpdb->prefix.'hrim_sections',$data,['id'=>$id]):$wpdb->insert($wpdb->prefix.'hrim_sections',$data);
         if($r!==false && $id){ $wpdb->update($wpdb->prefix.'hrim_questions',['section_name'=>$name],['section_id'=>$id]); }
         $this->save_result($r,'hotel-inspection-checklist-sections',$id?'Checklist section updated successfully.':'Checklist section saved successfully.');
     }
     public function delete_section(){
         $this->guard_manage('hrim_delete_section'); global $wpdb; $id=absint($_POST['id']??0);
-        $deps=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_questions WHERE section_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_template_sections WHERE section_id=%d)",$id,$id));
-        if($deps) $this->dependency_error('hotel-inspection-checklist-sections','Cannot delete this section because checklist points are linked to it. Reassign those points first.');
-        $this->save_result($wpdb->delete($wpdb->prefix.'hrim_sections',['id'=>$id]),'hotel-inspection-checklist-sections','Checklist section deleted successfully.');
+        $p=$wpdb->prefix;
+        $section=$wpdb->get_row($wpdb->prepare("SELECT id,name FROM {$p}hrim_sections WHERE id=%d",$id));
+        if(!$section)$this->dependency_error('hotel-inspection-checklist-sections','Checklist section was not found.');
+        $question_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT id FROM {$p}hrim_questions WHERE section_id=%d",$id)));
+        $deleted_points=0;$retained_history=0;
+        $wpdb->query('START TRANSACTION');
+        if($question_ids){
+            $ids=implode(',',$question_ids);
+            $used_ids=array_map('intval',$wpdb->get_col("SELECT q.id FROM {$p}hrim_questions q WHERE q.id IN ({$ids}) AND (EXISTS (SELECT 1 FROM {$p}hrim_answers a WHERE a.question_id=q.id) OR EXISTS (SELECT 1 FROM {$p}hrim_issues i WHERE i.question_id=q.id) OR EXISTS (SELECT 1 FROM {$p}hrim_periodic_task_answers pa WHERE pa.question_id=q.id) OR EXISTS (SELECT 1 FROM {$p}hrim_periodic_task_update_log pl WHERE pl.question_id=q.id))"));
+            $unused_ids=array_values(array_diff($question_ids,$used_ids));
+            $wpdb->query("DELETE FROM {$p}hrim_room_question_exclusions WHERE question_id IN ({$ids})");
+            $wpdb->query("DELETE FROM {$p}hrim_room_question_removals WHERE question_id IN ({$ids})");
+            $wpdb->query("DELETE FROM {$p}hrim_room_question_additions WHERE question_id IN ({$ids})");
+            $wpdb->query("DELETE FROM {$p}hrim_periodic_task_question_exclusions WHERE question_id IN ({$ids})");
+            if($unused_ids){$unused=implode(',',$unused_ids);$wpdb->query("DELETE FROM {$p}hrim_questions WHERE id IN ({$unused})");$deleted_points=count($unused_ids);}
+            if($used_ids){$used=implode(',',$used_ids);$wpdb->query($wpdb->prepare("UPDATE {$p}hrim_questions SET is_library=0,section_id=NULL,template_id=0,section_name=%s WHERE id IN ({$used})",$section->name));$retained_history=count($used_ids);}
+        }
+        $wpdb->delete($p.'hrim_room_sections',['section_id'=>$id]);
+        $wpdb->delete($p.'hrim_periodic_task_sections',['section_id'=>$id]);
+        $wpdb->delete($p.'hrim_template_sections',['section_id'=>$id]);
+        $deleted=$wpdb->delete($p.'hrim_sections',['id'=>$id]);
+        if($deleted===false){$wpdb->query('ROLLBACK');$this->dependency_error('hotel-inspection-checklist-sections',$wpdb->last_error?:'Checklist section could not be deleted.');}
+        $wpdb->query('COMMIT');
+        $this->audit('Checklist Sections','delete',$id,['checkpoints_deleted'=>$deleted_points,'historical_checkpoints_retained'=>$retained_history]);
+        $this->back('hotel-inspection-checklist-sections','saved',sprintf('Section deleted successfully. %d checklist point(s) removed.',$deleted_points));
     }
 
     public function save_template(){
@@ -3179,21 +4466,23 @@ Assets:
     }
     public function save_question(){
         $this->guard_manage('hrim_save_question'); global $wpdb;
-        $redirect_slug=sanitize_key(wp_unslash($_POST['redirect_slug']??''))==='hotel-inspection-sectionwise-checklist'?'hotel-inspection-sectionwise-checklist':'hotel-inspection-templates';
-        $id=absint($_POST['id']??0); $section_id=absint($_POST['section_id']??0);
+        $redirect_slug='hotel-inspection-sectionwise-checklist';
+        $id=absint($_POST['id']??0); $section_id=absint($_POST['section_id']??0); $department_id=absint($_POST['department_id']??0);
         $section=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_sections WHERE id=%d AND status='active'",$section_id));
         if(!$section) $this->dependency_error($redirect_slug,'Please select a valid active checklist section.');
+        if(!$department_id || !(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_departments WHERE id=%d AND status='active'",$department_id))) $this->dependency_error($redirect_slug,'Please select a valid active department.');
         $question=sanitize_textarea_field(wp_unslash($_POST['question']??''));
         if(!$question)$this->dependency_error($redirect_slug,'Checkpoint is required.');
         $dup=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_questions WHERE section_id=%d AND is_library=1 AND LOWER(TRIM(question))=LOWER(TRIM(%s)) AND id<>%d LIMIT 1",$section_id,$question,$id));
         if($dup)$this->dependency_error($redirect_slug,'This checkpoint already exists in the selected section.');
-        $data=['template_id'=>0,'section_id'=>$section_id,'section_name'=>$section->name,'question'=>$question,'question_type'=>in_array($_POST['question_type']??'yes_no',['yes_no','rating','text'],true)?$_POST['question_type']:'yes_no','required_flag'=>isset($_POST['required_flag'])?1:0,'is_library'=>1,'sort_order'=>intval($_POST['sort_order']??0)];
+        $data=['template_id'=>0,'section_id'=>$section_id,'department_id'=>$department_id,'section_name'=>$section->name,'question'=>$question,'question_type'=>in_array($_POST['question_type']??'yes_no',['yes_no','rating','text'],true)?$_POST['question_type']:'yes_no','required_flag'=>isset($_POST['required_flag'])?1:0,'is_library'=>1,'sort_order'=>intval($_POST['sort_order']??0)];
+        // Assets reference reusable checkpoints by question_id, so changing the master department here immediately applies to every current asset using this checkpoint. Historical inspection/issue rows keep their saved department_id.
         $r=$id?$wpdb->update($wpdb->prefix.'hrim_questions',$data,['id'=>$id]):$wpdb->insert($wpdb->prefix.'hrim_questions',$data);
         $this->save_result($r,$redirect_slug,$id?'Checkpoint updated successfully.':'Checkpoint saved successfully.');
     }
     public function delete_question(){
         $this->guard_manage('hrim_delete_question'); global $wpdb;
-        $redirect_slug=sanitize_key(wp_unslash($_POST['redirect_slug']??''))==='hotel-inspection-sectionwise-checklist'?'hotel-inspection-sectionwise-checklist':'hotel-inspection-templates';
+        $redirect_slug='hotel-inspection-sectionwise-checklist';
         $id=absint($_POST['id']);
         $deps=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_answers WHERE question_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues WHERE question_id=%d)",$id,$id));
         if($deps)$this->dependency_error($redirect_slug,'Cannot delete this reusable checkpoint because inspection answers or issues are linked to it.');
@@ -3206,16 +4495,17 @@ Assets:
         $room_id=absint($_POST['room_id']??0);
         $room=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_rooms WHERE id=%d",$room_id));
         if(!$room) wp_die('Invalid room');
-        $assigned_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT DISTINCT template_id FROM (SELECT template_id FROM {$wpdb->prefix}hrim_room_templates WHERE room_id=%d UNION SELECT ct.template_id FROM {$wpdb->prefix}hrim_category_templates ct WHERE ct.category_id=%d AND NOT EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions x WHERE x.room_id=%d AND x.template_id=ct.template_id)) permitted ORDER BY template_id",$room_id,(int)$room->category_id,$room_id)));
-        if(!$assigned_ids) wp_die('No inspection template is assigned to this room or its room category.');
+        $section_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_room_sections WHERE room_id=%d ORDER BY sort_order,section_id",$room_id)));
+        if(!$section_ids) wp_die('No section is selected for this asset.');
         $posted=is_array($_POST['answers']??null)?$_POST['answers']:[];
         $batch=sanitize_text_field(wp_unslash($_POST['draft_batch_id']??''));
         if(!$batch) $batch=wp_generate_uuid4();
         $now=$this->ist_now_mysql();
         $overall_remarks=sanitize_textarea_field(wp_unslash($_POST['remarks']??''));
         $created=0; $wpdb->query('START TRANSACTION');
-        foreach($assigned_ids as $template_id){
-            $valid_rows=$wpdb->get_results($wpdb->prepare("SELECT DISTINCT q.id,q.question,q.section_id,s.department_id,q.required_flag FROM {$wpdb->prefix}hrim_template_sections ts INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=ts.section_id AND q.is_library=1 INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id WHERE ts.template_id=%d AND rx.question_id IS NULL UNION ALL SELECT q.id,q.question,q.section_id,s.department_id,q.required_flag FROM {$wpdb->prefix}hrim_room_question_additions a INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE a.room_id=%d AND a.template_id=%d",$room_id,$template_id,$room_id,$template_id));
+        foreach([0] as $template_id){
+            $ph=implode(',',array_fill(0,count($section_ids),'%d'));
+            $valid_rows=$wpdb->get_results($wpdb->prepare("SELECT q.id,q.question,q.section_id,COALESCE(NULLIF(q.department_id,0),s.department_id) department_id,q.required_flag FROM {$wpdb->prefix}hrim_questions q INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id WHERE q.is_library=1 AND q.section_id IN ($ph) AND rx.question_id IS NULL AND rr.question_id IS NULL UNION ALL SELECT q.id,q.question,q.section_id,COALESCE(NULLIF(q.department_id,0),s.department_id) department_id,q.required_flag FROM {$wpdb->prefix}hrim_room_question_additions a INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE a.room_id=%d",array_merge([$room_id,$room_id],$section_ids,[$room_id])));
             $valid=[]; foreach($valid_rows as $q)$valid[(int)$q->id]=$q;
             $template_answers=is_array($posted[$template_id]??null)?$posted[$template_id]:[];
             if($mode==='complete'){
@@ -3249,7 +4539,11 @@ Assets:
                 $wpdb->insert($wpdb->prefix.'hrim_answers',['inspection_id'=>$iid,'question_id'=>$qid,'answer_text'=>$v,'result_status'=>$res,'remarks'=>$rem,'attachment_ids'=>implode(',',$att),'video_attachment_ids'=>implode(',',$videos)]);
                 if($mode==='complete' && ($res==='fail'||$v==='no')){
                     $already=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_issues WHERE inspection_id=%d AND question_id=%d LIMIT 1",$iid,$qid));
-                    $issue_data=['source'=>'inspection','inspection_id'=>$iid,'hotel_id'=>$room->hotel_id,'floor_id'=>$room->floor_id,'room_id'=>$room_id,'section_id'=>$valid[$qid]->section_id,'department_id'=>absint($valid[$qid]->department_id??0),'question_id'=>$qid,'title'=>$valid[$qid]->question,'description'=>$rem,'priority'=>'medium','status'=>'open','reported_by'=>get_current_user_id(),'attachment_ids'=>implode(',',$att),'created_at'=>$now];
+                    // Inspection-generated issues are assigned immediately to the checkpoint's Department Head.
+                    $issue_department_id=absint($valid[$qid]->department_id??0);
+                    $assigned=(int)$wpdb->get_var($wpdb->prepare("SELECT department_head_user_id FROM {$wpdb->prefix}hrim_departments WHERE id=%d AND status='active'",$issue_department_id));
+                    if($assigned && !get_userdata($assigned)) $assigned=0;
+                    $issue_data=['source'=>'inspection','inspection_id'=>$iid,'hotel_id'=>$room->hotel_id,'floor_id'=>$room->floor_id,'room_id'=>$room_id,'section_id'=>$valid[$qid]->section_id,'department_id'=>$issue_department_id,'question_id'=>$qid,'title'=>$valid[$qid]->question,'description'=>$rem,'priority'=>'medium','status'=>$assigned?'assigned':'open','assigned_to'=>$assigned?:null,'reported_by'=>get_current_user_id(),'attachment_ids'=>implode(',',$att),'created_at'=>$now];
                     if($already) $wpdb->update($wpdb->prefix.'hrim_issues',$issue_data,['id'=>$already]); else { $wpdb->insert($wpdb->prefix.'hrim_issues',$issue_data); $new_issue_id=(int)$wpdb->insert_id; if($new_issue_id)$this->notify_department_for_issue($new_issue_id); }
                 }
             }
@@ -3257,7 +4551,7 @@ Assets:
         }
         $wpdb->query('COMMIT');
         if($mode==='in_progress') $this->back('hotel-inspection-in-progress','draft_saved','Inspection saved in progress successfully.');
-        $this->back('perform-room-inspection','submitted',sprintf('%d assigned checklist(s) submitted successfully.',$created));
+        $this->back('perform-room-inspection','submitted','Inspection submitted successfully.');
     }
 
     public function delete_in_progress(){
@@ -3284,11 +4578,18 @@ Assets:
         $floor_id=absint($_POST['floor_id']??0);
         $room_id=absint($_POST['room_id']??0);
         $section_id=absint($_POST['section_id']??0);
+        $department_id=absint($_POST['department_id']??0);
+        $direct_issue=!empty($_POST['direct_issue']);
         $title=sanitize_text_field(wp_unslash($_POST['title']??''));
         $description=sanitize_textarea_field(wp_unslash($_POST['description']??''));
 
         if($title===''||$description===''){
             $this->issue_back('add',0,'error','Issue title and description are required.');
+        }
+
+        // Direct Add Issue requires an Asset.
+        if($direct_issue && !$room_id){
+            $this->issue_back('add',0,'error','Please select an asset.');
         }
 
         // When a room is selected, derive its actual parent keys instead of trusting stale dropdown values.
@@ -3302,6 +4603,7 @@ Assets:
         }
 
         if(!$hotel_id) $this->issue_back('add',0,'error','Please select a property.');
+        if(!$floor_id) $this->issue_back('add',0,'error','Please select a floor.');
         if(!(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_hotels WHERE id=%d",$hotel_id))){
             $this->issue_back('add',0,'error','Selected property was not found.');
         }
@@ -3318,10 +4620,11 @@ Assets:
         }
 
         $priority='medium';
-        $assigned=absint($_POST['assigned_to']??0);
-        if($assigned && !get_userdata($assigned)) $this->issue_back('add',0,'error','Selected staff member was not found.');
-        $due_date=sanitize_text_field(wp_unslash($_POST['due_date']??''));
-        if($due_date!=='' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$due_date)) $this->issue_back('add',0,'error','Due date is invalid.');
+        // v3.19.31: Manual issues are automatically assigned to the selected Department Head.
+        $assigned=(int)$wpdb->get_var($wpdb->prepare("SELECT department_head_user_id FROM {$wpdb->prefix}hrim_departments WHERE id=%d AND status='active'",$department_id));
+        if($assigned && !get_userdata($assigned)) $assigned=0;
+        // Due Date is no longer user-entered. New issues automatically use today's IST date.
+        $due_date=$this->ist_date('Y-m-d');
 
         $attachments=[];
         if(!empty($_FILES['issue_photos']['name'][0])){
@@ -3374,7 +4677,8 @@ Assets:
         if($issue_id)$this->notify_department_for_issue($issue_id);
         $this->audit('issues','create',$issue_id,['source'=>'manual','hotel_id'=>$hotel_id,'floor_id'=>$floor_id,'room_id'=>$room_id,'title'=>$title]);
         clean_post_cache($issue_id);
-        $this->issue_back('add',(int)$wpdb->insert_id,'saved','Manual issue created successfully.');
+        $url=add_query_arg(['saved'=>'1','hrim_msg'=>rawurlencode('Manual issue created successfully.'),'hrim_refresh'=>time()],$this->page_url('hotel-inspection-pending-issues'));
+        wp_safe_redirect($url,303); exit;
     }
 
     public function assign_issue(){
@@ -3422,7 +4726,7 @@ Assets:
         if(!$issue) $this->issue_back('progress',$issue_id,'error','Issue not found.');
         $update_date=$this->ist_now_mysql();
         $attachments=[];
-        if(!empty($_FILES['update_photos']['name'][0])){ require_once ABSPATH.'wp-admin/includes/file.php'; require_once ABSPATH.'wp-admin/includes/media.php'; require_once ABSPATH.'wp-admin/includes/image.php'; foreach($_FILES['update_photos']['name'] as $i=>$name){ if(!$name)continue; $_FILES['hrim_single_update_photo']=['name'=>$name,'type'=>$_FILES['update_photos']['type'][$i],'tmp_name'=>$_FILES['update_photos']['tmp_name'][$i],'error'=>$_FILES['update_photos']['error'][$i],'size'=>$_FILES['update_photos']['size'][$i]]; $aid=media_handle_upload('hrim_single_update_photo',0); if(!is_wp_error($aid))$attachments[]=(int)$aid; } unset($_FILES['hrim_single_update_photo']); }
+        if(!empty($_FILES['update_photos']['name'][0])){ require_once ABSPATH.'wp-admin/includes/file.php'; require_once ABSPATH.'wp-admin/includes/media.php'; require_once ABSPATH.'wp-admin/includes/image.php'; foreach($_FILES['update_photos']['name'] as $i=>$name){ if(!$name)continue; $_FILES['hrim_single_update_photo']=['name'=>$name,'type'=>$_FILES['update_photos']['type'][$i],'tmp_name'=>$_FILES['update_photos']['tmp_name'][$i],'error'=>$_FILES['update_photos']['error'][$i],'size'=>$_FILES['update_photos']['size'][$i]]; $aid=media_handle_upload('hrim_single_update_photo',0); if(!is_wp_error($aid)){$aid=$this->optimize_roomscore_image_attachment($aid);$attachments[]=(int)$aid;} } unset($_FILES['hrim_single_update_photo']); }
         $data=['status'=>$status,'resolution_remarks'=>$remarks];
         if($status==='resolved'){ $data['resolved_at']=$update_date; $data['resolved_by']=get_current_user_id(); $data['resolution_attachment_ids']=$attachments?wp_json_encode($attachments):null; }
         else { $data['resolved_at']=null; $data['resolved_by']=null; }
@@ -3439,10 +4743,46 @@ Assets:
             'saved'=>'1',
             'hrim_msg'=>rawurlencode($message),
             'hrim_refresh'=>time(),
-        ],$this->page_url('hotel-inspection-issues'));
+        ],$this->page_url('hotel-inspection-pending-issues'));
         wp_safe_redirect($url,303);
         exit;
 
+    }
+
+    public function save_issue_supervision(){
+        if(!$this->can_issues()&&!$this->can_manage()) wp_die('Permission denied');
+        check_admin_referer('hrim_save_issue_supervision'); global $wpdb;
+        $issue_id=absint($_POST['issue_id']??0);
+        $satisfied=sanitize_key($_POST['satisfied']??'');
+        $remarks=sanitize_textarea_field(wp_unslash($_POST['supervision_remarks']??''));
+        $supervision_date=sanitize_text_field(wp_unslash($_POST['supervision_date']??''));
+        if(!$issue_id||!in_array($satisfied,['yes','no'],true)||$remarks===''||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$supervision_date)) $this->dependency_error('hotel-inspection-pending-supervision','Please complete all supervision fields.');
+        $issue=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}hrim_issues WHERE id=%d AND status='resolved'",$issue_id));
+        if(!$issue) $this->dependency_error('hotel-inspection-pending-supervision','This issue is no longer pending supervision.');
+        $now=$this->ist_now_mysql();
+        $time_part=$this->ist_date('H:i:s');
+        $supervision_datetime=$supervision_date.' '.$time_part;
+        $new_status=$satisfied==='yes'?'verified':'reopened';
+        $data=['status'=>$new_status];
+        if($satisfied==='yes'){
+            $data['verified_at']=$supervision_datetime;
+            $data['verified_by']=get_current_user_id();
+        } else {
+            $data['resolved_at']=null;
+            $data['resolved_by']=null;
+            $data['verified_at']=null;
+            $data['verified_by']=null;
+        }
+        $ok=$wpdb->update($wpdb->prefix.'hrim_issues',$data,['id'=>$issue_id]);
+        if($ok===false) $this->dependency_error('hotel-inspection-pending-supervision',$wpdb->last_error?:'Supervision update could not be saved.');
+        $log_remarks='Satisfied with work: '.($satisfied==='yes'?'Yes':'No')."\nSupervision Remarks: ".$remarks;
+        $wpdb->insert($wpdb->prefix.'hrim_issue_updates',['issue_id'=>$issue_id,'update_type'=>'supervision','status'=>$new_status,'remarks'=>$log_remarks,'update_date'=>$supervision_datetime,'updated_by'=>get_current_user_id()]);
+        $this->audit('issues','supervision',$issue_id,['satisfied'=>$satisfied,'remarks'=>$remarks,'supervision_date'=>$supervision_date,'status'=>$new_status]);
+        $this->notify_department_for_issue_update($issue_id,$satisfied==='yes'?'Supervision Approved':'Supervision Rejected',$remarks);
+        $redirect='hotel-inspection-pending-supervision';
+        $message=$satisfied==='yes'?'Supervision approved. Issue moved to Issue Resolved.':'Supervision not satisfied. Issue returned to Unresolved Issues.';
+        $url=add_query_arg(['saved'=>'1','hrim_msg'=>rawurlencode($message),'hrim_refresh'=>time()],$this->page_url($redirect));
+        wp_safe_redirect($url,303); exit;
     }
 
     public function update_issue(){
@@ -3451,31 +4791,33 @@ Assets:
         global $wpdb;
         $id=absint($_POST['issue_id']??0);
         if(!$id) $this->issue_back('edit',$id,'error','Invalid issue selected.');
-        $existing=$wpdb->get_row($wpdb->prepare("SELECT id,title,description,due_date FROM {$wpdb->prefix}hrim_issues WHERE id=%d",$id));
+        $existing=$wpdb->get_row($wpdb->prepare("SELECT id,title,description FROM {$wpdb->prefix}hrim_issues WHERE id=%d",$id));
         if(!$existing) $this->issue_back('edit',$id,'error','Issue not found.');
         $data=[
             'title'=>sanitize_text_field(wp_unslash($_POST['title']??'')),
             'description'=>sanitize_textarea_field(wp_unslash($_POST['description']??'')),
-            'due_date'=>sanitize_text_field($_POST['due_date']??'')?:null,
         ];
         if($data['title']==='' || $data['description']==='') $this->issue_back('edit',$id,'error','Issue title and remarks are required.');
         $result=$wpdb->update($wpdb->prefix.'hrim_issues',$data,['id'=>$id]);
         if($result===false) $this->issue_back('edit',$id,'error',$wpdb->last_error?:'Issue could not be updated.');
         $changes=[];
         if((string)$existing->description!==(string)$data['description'])$changes[]='Remarks: '.$data['description'];
-        if((string)($existing->due_date?:'')!==(string)($data['due_date']?:''))$changes[]='Due Date: '.($data['due_date']?$this->ist_date('d/m/Y',$data['due_date']):'Removed');
-        if($changes)$this->notify_department_for_issue_update($id,'Remarks or Due Date Updated',implode("\n",$changes));
-        $this->issue_back('edit',$id,'saved','Issue updated successfully.');
+        if($changes)$this->notify_department_for_issue_update($id,'Issue Updated',implode("\n",$changes));
+        $url=add_query_arg(['saved'=>'1','hrim_msg'=>rawurlencode('Issue updated successfully.'),'hrim_refresh'=>time()],$this->page_url('hotel-inspection-pending-issues'));
+        wp_safe_redirect($url,303); exit;
     }
 
     public function delete_issue(){ if(!$this->can_issues())wp_die('Permission denied');check_admin_referer('hrim_delete_issue');global $wpdb;$this->save_result($wpdb->delete($wpdb->prefix.'hrim_issues',['id'=>absint($_POST['id'])]),'hotel-inspection-issues','Issue deleted successfully.'); }
     public function save_user(){
         $this->guard_manage('hrim_save_user'); global $wpdb;
         $id=absint($_POST['id']??0);
-        $email=sanitize_email($_POST['email']??'');
-        if(!$email)$this->back('hotel-inspection-users','error','A valid email is required.');
-        $exists=email_exists($email);
-        if($exists && (int)$exists!==$id)$this->back('hotel-inspection-users','error','Email already belongs to another user.');
+        $raw_email=trim((string)wp_unslash($_POST['email']??''));
+        $email=$raw_email===''?'':sanitize_email($raw_email);
+        if($raw_email!=='' && $email==='')$this->back('hotel-inspection-users','error','Please enter a valid email address or leave Email blank.');
+        if($email!==''){
+            $exists=email_exists($email);
+            if($exists && (int)$exists!==$id)$this->back('hotel-inspection-users','error','Email already belongs to another user.');
+        }
         $mobile=$this->normalize_mobile_number(wp_unslash($_POST['mobile']??''));
         if(strlen($mobile)<10 || strlen($mobile)>15)$this->back('hotel-inspection-users','error','A valid mobile number with country code is required.');
         $display_name=trim(sanitize_text_field(wp_unslash($_POST['display_name']??'')));
@@ -3488,18 +4830,19 @@ Assets:
         if(!in_array($role,['hrim_worker','hrim_supervisor','hrim_manager','hrim_owner'],true)) $this->back('hotel-inspection-users','error','Please select a valid Role.');
         $status=sanitize_key($_POST['status']??'');
         if(!in_array($status,['active','inactive'],true)) $this->back('hotel-inspection-users','error','Please select a valid Status.');
-        $department_ids=array_values(array_unique(array_filter(array_map('absint',(array)($_POST['department_ids']??[])))));
-        $valid_department_ids=[];
-        foreach($department_ids as $department_id){
-            if((int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}hrim_departments WHERE id=%d AND status='active'",$department_id))) $valid_department_ids[]=$department_id;
-        }
-        if(!$valid_department_ids) $this->back('hotel-inspection-users','error','Please select at least one Department.');
         $view_map=$this->configurable_view_map();
         $valid_view_slugs=array_values(array_map(function($view){ return $view['slug']; },$view_map));
         $allowed_views=array_values(array_unique(array_filter(array_map('sanitize_text_field',(array)($_POST['allowed_views']??[])))));
         $allowed_views=array_values(array_intersect($valid_view_slugs,$allowed_views));
-        if(!$allowed_views) $this->back('hotel-inspection-users','error','Please select at least one View to show.');
+        // v3.19.15: It is valid to select no optional views because all five Issue views are always available.
         if($id){
+            $current_user=get_userdata($id);
+            if(!$current_user)$this->back('hotel-inspection-users','error','User not found.');
+            if((string)$current_user->user_login!==$username){
+                $updated_login=$wpdb->update($wpdb->users,['user_login'=>$username],['ID'=>$id],['%s'],['%d']);
+                if($updated_login===false)$this->back('hotel-inspection-users','error',$wpdb->last_error?:'Username could not be updated.');
+                clean_user_cache($id);
+            }
             $data=['ID'=>$id,'user_email'=>$email,'display_name'=>$display_name];
             if(!empty($_POST['password']))$data['user_pass']=(string)$_POST['password'];
             $r=wp_update_user($data);
@@ -3515,10 +4858,8 @@ Assets:
         }
         update_user_meta($id,'hrim_user_status',$status);
         update_user_meta($id,'hrim_mobile',$mobile);
+        // Department assignment is no longer used for user data visibility.
         $wpdb->delete($wpdb->prefix.'hrim_user_departments',['user_id'=>$id]);
-        foreach($valid_department_ids as $department_id){
-            $wpdb->insert($wpdb->prefix.'hrim_user_departments',['user_id'=>$id,'department_id'=>$department_id]);
-        }
         update_user_meta($id,'hrim_allowed_views',$allowed_views);
         clean_user_cache($id);
         wp_cache_flush();
@@ -3539,190 +4880,125 @@ Assets:
     public function delete_user(){ $this->guard_manage('hrim_delete_user'); global $wpdb; $id=absint($_POST['id']); if($id===get_current_user_id())$this->dependency_error('hotel-inspection-users','You cannot delete your own logged-in account.'); $deps=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_inspections WHERE inspector_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues WHERE assigned_to=%d)",$id,$id)); if($deps)$this->dependency_error('hotel-inspection-users','Cannot delete this user because inspections or assigned issues are linked to the account.'); require_once ABSPATH.'wp-admin/includes/user.php'; if(!wp_delete_user($id))$this->dependency_error('hotel-inspection-users','User could not be deleted.'); $this->back('hotel-inspection-users','saved','User deleted successfully.'); }
     public function save_profile(){ if(!is_user_logged_in())wp_die('Permission denied');check_admin_referer('hrim_save_profile');$d=['ID'=>get_current_user_id(),'display_name'=>sanitize_text_field($_POST['display_name'])];if(!empty($_POST['password']))$d['user_pass']=(string)$_POST['password'];wp_update_user($d);$this->back('hotel-inspection-profile','saved','Profile updated successfully.'); }
     public function learn_shortcode(){
-        $modules=[
-            [
-                'title'=>'1. Start with the Dashboard',
-                'summary'=>'Understand the overall quality position and the items requiring attention.',
-                'steps'=>[
-                    ['Review dashboard summary cards and understand each count.','hotel-inspection-dashboard'],
-                    ['Read the department-wise issue summary and identify pending work.','hotel-inspection-dashboard'],
-                    ['Open Room Score and compare room quality results.','hotel-inspection-room-scores'],
-                    ['Open Floor Score and compare floor performance.','hotel-inspection-floor-scores'],
-                ],
-            ],
-            [
-                'title'=>'2. Configure the Masters',
-                'summary'=>'Create the basic structure used throughout RoomScore.',
-                'steps'=>[
-                    ['Create or review the Property master.','hotel-inspection-properties'],
-                    ['Create floors and assign floor managers.','hotel-inspection-floors'],
-                    ['Create room categories.','hotel-inspection-room-categories'],
-                    ['Create rooms and map categories and templates.','hotel-inspection-rooms'],
-                    ['Create departments responsible for inspections and issues.','hotel-inspection-departments'],
-                    ['Create users, select roles and assign departments.','hotel-inspection-users'],
-                ],
-                'manager_only'=>true,
-            ],
-            [
-                'title'=>'3. Build the Inspection Checklist',
-                'summary'=>'Learn how sections, checkpoints and templates work together.',
-                'steps'=>[
-                    ['Create checklist sections and set their order.','hotel-inspection-checklist-sections'],
-                    ['Add checkpoints under the correct sections.','hotel-inspection-sectionwise-checklist'],
-                    ['Mark important checkpoints as mandatory.','hotel-inspection-sectionwise-checklist'],
-                    ['Create an inspection template and select the required sections.','hotel-inspection-templates'],
-                    ['Assign templates through room categories or individual rooms.','hotel-inspection-rooms'],
-                ],
-                'manager_only'=>true,
-            ],
-            [
-                'title'=>'4. Perform a Room Inspection',
-                'summary'=>'Complete the full mobile-friendly room-inspection workflow.',
-                'steps'=>[
-                    ['Select a room and load its assigned inspection checklist.','perform-room-inspection'],
-                    ['Mark checkpoints Yes or No.','perform-room-inspection'],
-                    ['Add a photograph to a checkpoint.','perform-room-inspection'],
-                    ['Add a short video where evidence is useful.','perform-room-inspection'],
-                    ['Enter mandatory remarks for every No response.','perform-room-inspection'],
-                    ['Save one section and continue the inspection.','perform-room-inspection'],
-                    ['Save an inspection in progress and reopen it.','hotel-inspection-in-progress'],
-                    ['Complete and submit a full inspection.','perform-room-inspection'],
-                ],
-            ],
-            [
-                'title'=>'5. Review Inspection Results',
-                'summary'=>'Learn how completed and incomplete inspections are tracked.',
-                'steps'=>[
-                    ['Review all inspections currently in progress.','hotel-inspection-in-progress'],
-                    ['Open an in-progress inspection and check section completion.','hotel-inspection-in-progress'],
-                    ['Open Inspection History and locate a completed inspection.','hotel-inspection-history'],
-                    ['Open inspection details and review section and checkpoint results.','hotel-inspection-history'],
-                    ['Use search and Excel download in inspection views.','hotel-inspection-history'],
-                ],
-            ],
-            [
-                'title'=>'6. Manage Issues',
-                'summary'=>'Follow an issue from identification through assignment, resolution and closure.',
-                'steps'=>[
-                    ['Review issues generated automatically from No responses.','hotel-inspection-issues'],
-                    ['Create a manual issue when required.','hotel-inspection-issues'],
-                    ['Assign an unassigned issue to the appropriate employee.','hotel-inspection-pending-assign-issues'],
-                    ['Set a due date and add assignment remarks.','hotel-inspection-pending-assign-issues'],
-                    ['Update an issue as In Progress.','hotel-inspection-pending-issues'],
-                    ['Resolve an issue with remarks and evidence.','hotel-inspection-pending-issues'],
-                    ['Review resolved issues.','hotel-inspection-resolved-issues'],
-                    ['Understand delayed issues and department-level issue visibility.','hotel-inspection-issues'],
-                ],
-            ],
-            [
-                'title'=>'7. Use Periodic Tasks',
-                'summary'=>'Set up recurring room activities and monitor every cycle.',
-                'steps'=>[
-                    ['Create a periodic task with applicability, periodicity and start date.','hotel-inspection-add-periodic-task'],
-                    ['Select the applicable checklist sections and responsible department.','hotel-inspection-add-periodic-task'],
-                    ['Review and edit periodic-task masters.','hotel-inspection-periodic-tasks'],
-                    ['Open a scheduled task cycle from Schedule Tasks In Progress.','hotel-inspection-schedule-tasks-in-progress'],
-                    ['Complete the periodic task room by room.','hotel-inspection-schedule-tasks-in-progress'],
-                    ['Understand Yet to Start, In Progress and Completed status.','hotel-inspection-schedule-tasks-in-progress'],
-                    ['Review all periodic-task updates in Schedule Tasks History.','hotel-inspection-schedule-tasks-history'],
-                ],
-            ],
-            [
-                'title'=>'8. Manage Occupancy',
-                'summary'=>'Record occupancy and keep room availability information current.',
-                'steps'=>[
-                    ['Add occupancy information for the selected date.','hotel-inspection-add-occupancy'],
-                    ['Update the office count where applicable.','hotel-inspection-update-office-count'],
-                    ['Review occupancy status room by room.','hotel-inspection-occupancy-check'],
-                    ['Use occupancy search and Excel download.','hotel-inspection-occupancy-check'],
-                ],
-            ],
-            [
-                'title'=>'9. Reports and Exports',
-                'summary'=>'Use built-in reports and Excel exports for management review.',
-                'steps'=>[
-                    ['Open the Reports view and review available summaries.','hotel-inspection-reports'],
-                    ['Use date and other available filters.','hotel-inspection-reports'],
-                    ['Download Excel from registers and reports.','hotel-inspection-reports'],
-                    ['Compare Room Score, Floor Score and issue reports.','hotel-inspection-reports'],
-                ],
-            ],
-            [
-                'title'=>'10. Settings and Maintenance',
-                'summary'=>'Understand the administrative tools used to maintain the application.',
-                'steps'=>[
-                    ['Change the application accent colour.','hotel-inspection-settings'],
-                    ['Regenerate missing application pages.','hotel-inspection-settings'],
-                    ['Install the checklist library when required.','hotel-inspection-settings'],
-                    ['Run Repair Application after structural upgrades or missing-page issues.','hotel-inspection-settings'],
-                ],
-                'manager_only'=>true,
-            ],
-            [
-                'title'=>'11. Mobile and Daily Usage',
-                'summary'=>'Practise the workflow exactly as employees will use it each day.',
-                'steps'=>[
-                    ['Open RoomScore on a mobile phone and use the responsive menu.','hotel-inspection-dashboard'],
-                    ['Perform an inspection using the camera and remarks controls.','perform-room-inspection'],
-                    ['Confirm that the left menu keeps its scroll position.','hotel-inspection-dashboard'],
-                    ['Log out and sign in again using the RoomScore login form.','hotel-inspection-login'],
-                ],
-            ],
-        ];
-        if(!$this->can_manage()){
-            $modules=array_values(array_filter($modules,function($module){ return empty($module['manager_only']); }));
-        }
-        $saved=array_values(array_filter(array_map('sanitize_key',(array)get_user_meta(get_current_user_id(),'hrim_learn_progress',true))));
-        $total=0;
-        foreach($modules as $module) $total+=count($module['steps']);
-        $completed=0;
-        foreach($modules as $mi=>$module){ foreach($module['steps'] as $si=>$step){ if(in_array('m'.$mi.'s'.$si,$saved,true)) $completed++; } }
-        $percent=$total?round(($completed/$total)*100):0;
+        $guide_url=HRIM_URL.'assets/docs/roomscore-user-guide.pdf';
         ob_start(); ?>
-        <div class="hrim-learn-page" data-total="<?php echo esc_attr($total); ?>">
-          <section class="hrim-learn-hero">
+        <div class="hrim-learn-guide-page">
+          <div class="hrim-panel hrim-learn-guide-toolbar">
             <div>
-              <span class="hrim-learn-eyebrow">RoomScore Training</span>
-              <h2>Learn Every Feature Step by Step</h2>
-              <p>Complete the practical steps below in sequence. When all steps are completed, the user will have practised the complete RoomScore workflow.</p>
+              <h2>RoomScore User Guide</h2>
+              <p>Quick reference for daily use and administration</p>
             </div>
-            <div class="hrim-learn-progress-card">
-              <strong><span id="hrimLearnCompleted"><?php echo esc_html($completed); ?></span> / <?php echo esc_html($total); ?></strong>
-              <small>Steps completed</small>
-              <div class="hrim-learn-progress"><span id="hrimLearnProgressBar" style="width:<?php echo esc_attr($percent); ?>%"></span></div>
-              <b id="hrimLearnPercent"><?php echo esc_html($percent); ?>%</b>
-            </div>
-          </section>
-          <div class="hrim-learn-toolbar">
-            <span>Tick a step only after completing it inside the application.</span>
-            <button type="button" class="hrim-secondary" id="hrimLearnReset">Reset Progress</button>
+            <a class="hrim-primary hrim-learn-guide-download" href="<?php echo esc_url($guide_url); ?>" download="RoomScore-User-Guide.pdf">
+              <span class="dashicons dashicons-pdf"></span>
+              <span>Download PDF</span>
+            </a>
           </div>
-          <div class="hrim-learn-modules">
-          <?php foreach($modules as $mi=>$module): ?>
-            <section class="hrim-learn-module" style="background:#fff!important;border:1px solid var(--hrim-theme-color,var(--hrim-primary,var(--hrim-accent)))!important;box-shadow:none!important;">
-              <button type="button" class="hrim-learn-module-head" style="background:#fff!important;background-color:#fff!important;background-image:none!important;color:#000!important;border:0!important;box-shadow:none!important;filter:none!important;" aria-expanded="<?php echo $mi===0?'true':'false'; ?>">
-                <span><strong><?php echo esc_html($module['title']); ?></strong></span>
-                <span class="dashicons dashicons-arrow-down-alt2"></span>
-              </button>
-              <div class="hrim-learn-steps" <?php echo $mi===0?'':'hidden'; ?>>
-                <?php foreach($module['steps'] as $si=>$step): $key='m'.$mi.'s'.$si; $done=in_array($key,$saved,true); ?>
-                  <div class="hrim-learn-step <?php echo $done?'is-complete':''; ?>">
-                    <label>
-                      <input type="checkbox" class="hrim-learn-check" value="<?php echo esc_attr($key); ?>" <?php checked($done); ?>>
-                      <span class="hrim-learn-check-ui"><span class="dashicons dashicons-yes"></span></span>
-                      <span class="hrim-learn-step-text"><?php echo esc_html($step[0]); ?></span>
-                    </label>
-                    <a class="hrim-learn-open" href="<?php echo esc_url($this->page_url($step[1])); ?>">Open <span class="dashicons dashicons-arrow-right-alt"></span></a>
-                  </div>
-                <?php endforeach; ?>
-              </div>
+
+          <article class="hrim-panel hrim-learn-guide-content">
+            <section>
+              <h3>Dashboard</h3>
+              <ul>
+                <li>Review inspection-in-progress, pending assignment, pending inspections, pending issues and delayed issues.</li>
+                <li>Use department-wise counts to identify pending work.</li>
+                <li>Use Room Score to review asset inspection scores and issue counts.</li>
+              </ul>
             </section>
-          <?php endforeach; ?>
-          </div>
-          <div class="hrim-learn-complete" id="hrimLearnComplete" <?php echo $completed===$total?'':'hidden'; ?>>
-            <span class="dashicons dashicons-awards"></span>
-            <div><strong>Training Completed</strong><p>You have completed every RoomScore learning step.</p></div>
-          </div>
+
+            <section>
+              <h3>Masters</h3>
+              <ul>
+                <li>Maintain Floors, Asset Types, Assets, Departments and Users.</li>
+                <li>Assign users to the correct role and department.</li>
+                <li>Keep master data active and accurate before starting inspections.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Sections and Checkpoints</h3>
+              <ul>
+                <li>Create sections and checkpoints in Sectionwise Checklists.</li>
+                <li>Open an Asset and select its applicable Sections directly.</li>
+                <li>The checkpoints under those Sections will appear automatically during inspection.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Inspections</h3>
+              <ul>
+                <li>Select the asset and start the assigned checklist.</li>
+                <li>Mark each checkpoint Yes or No and add remarks/evidence where required.</li>
+                <li>Save progress when an inspection is incomplete and submit when complete.</li>
+                <li>Review completed inspections from Inspection History.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Issues</h3>
+              <ul>
+                <li>No responses can create issues automatically; manual issues can also be added.</li>
+                <li>Assign pending issues to the responsible employee with a due date.</li>
+                <li>Update issues to In Progress, resolve them with remarks/evidence, and review resolved issues.</li>
+                <li>Use delayed issues to identify overdue work.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Periodic Task</h3>
+              <ul>
+                <li>Use Add Periodic Task to create a recurring task with periodicity, applicability, department and start date.</li>
+                <li>Use Periodic Task to review or edit configured recurring tasks.</li>
+                <li>Use Upcoming Periodic Tasks for future cycles and Due Periodic Tasks for work that is due/in progress.</li>
+                <li>Complete due periodic tasks asset by asset.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Occupancy</h3>
+              <ul>
+                <li>Record Security Occupancy Count for the selected date.</li>
+                <li>Update Office Count where required.</li>
+                <li>Review Occupancy Check for asset-wise status.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Search, Filters and Excel</h3>
+              <ul>
+                <li>Use Search to quickly locate records in the current view.</li>
+                <li>Use Filter where available to narrow records.</li>
+                <li>Use the Excel download icon to export supported tables.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Settings</h3>
+              <ul>
+                <li>Update Property Name, Property Logo and application theme settings.</li>
+                <li>Use maintenance tools only when required for repair, page regeneration or checklist installation.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h3>Mobile Use</h3>
+              <ul>
+                <li>Use the mobile menu to navigate between views.</li>
+                <li>Inspection, issue and periodic-task workflows are designed for phone use.</li>
+                <li>Use the phone camera for photo/video evidence where the form provides evidence controls.</li>
+              </ul>
+            </section>
+
+            <section class="hrim-learn-daily-workflow">
+              <h3>Daily Workflow</h3>
+              <ol>
+                <li>Review Dashboard</li>
+                <li>Complete due inspections / periodic tasks</li>
+                <li>Assign pending issues</li>
+                <li>Update and resolve assigned issues</li>
+                <li>Review occupancy and scores</li>
+                <li>Export records when required</li>
+              </ol>
+            </section>
+          </article>
         </div>
         <?php return $this->shell('Learn',ob_get_clean(),'learn');
     }
@@ -3774,13 +5050,21 @@ Assets:
     public function save_notification_settings(){
         $this->guard_manage('hrim_save_notification_settings');
         $section=sanitize_key($_POST['settings_section']??'');
+        if($section==='message_auto_sender'){
+            update_option('hrim_mas_enabled',isset($_POST['mas_enabled'])?'1':'0',false);
+            update_option('hrim_mas_user_id',sanitize_text_field(wp_unslash($_POST['mas_user_id']??'')),false);
+            update_option('hrim_mas_group_id',sanitize_text_field(wp_unslash($_POST['mas_group_id']??'')),false);
+            $password=(string)wp_unslash($_POST['mas_password']??''); if($password!=='') update_option('hrim_mas_password',$password,false);
+            $this->back('hotel-inspection-communications','saved','Message Auto Sender settings saved successfully.');
+        }
         if($section==='telegram'){
             update_option('hrim_telegram_enabled',isset($_POST['telegram_enabled'])?'1':'0',false);
+            update_option('hrim_telegram_group_chat_id',sanitize_text_field(wp_unslash($_POST['telegram_group_chat_id']??'')),false);
             update_option('hrim_telegram_test_chat_id',sanitize_text_field(wp_unslash($_POST['telegram_test_chat_id']??'')),false);
             $token=trim((string)wp_unslash($_POST['telegram_bot_token']??'')); if($token!=='')update_option('hrim_telegram_bot_token',$token,false);
             $this->back('hotel-inspection-communications','saved','Telegram settings saved successfully.');
         }
-        $rules=[]; foreach(['pending_issues','upcoming_periodic','scheduled_not_started','scheduled_in_progress'] as $key){$posted=(array)($_POST['rules'][$key]??[]);$rules[$key]=['enabled'=>isset($posted['enabled'])?1:0,'interval_minutes'=>max(5,absint($posted['interval_minutes']??1440)),'days_before'=>max(0,absint($posted['days_before']??3)),'head'=>isset($posted['head'])?1:0,'telegram'=>isset($posted['telegram'])?1:0];}
+        $rules=[]; foreach(['unresolved_issues','pending_supervision'] as $key){$posted=(array)($_POST['rules'][$key]??[]);$start_time=sanitize_text_field(wp_unslash($posted['start_time']??'09:00'));if(!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/',$start_time))$start_time='09:00';$rules[$key]=['enabled'=>isset($posted['enabled'])?1:0,'start_time'=>$start_time,'interval_minutes'=>max(0,absint($posted['interval_minutes']??180)),'message_auto_sender'=>isset($posted['message_auto_sender'])?1:0,'telegram'=>isset($posted['telegram'])?1:0];}
         update_option('hrim_notifications_enabled',isset($_POST['notifications_enabled'])?'1':'0',false); update_option('hrim_notification_rules',$rules,false);
         if(!wp_next_scheduled('hrim_notification_cron'))wp_schedule_event(time()+60,'hrim_five_minutes','hrim_notification_cron');
         $this->back('hotel-inspection-communications','saved','Notification rules saved successfully.');
@@ -3789,13 +5073,38 @@ Assets:
         $this->guard_manage('hrim_test_telegram'); $tg=$this->telegram_settings(); $result=$this->send_telegram_message($tg['test_chat_id'],'RoomScore Telegram setup test successful.');
         $this->back('hotel-inspection-communications',is_wp_error($result)?'error':'saved',is_wp_error($result)?$result->get_error_message():'Test Telegram message sent successfully.');
     }
-    public function run_notifications_now(){ $this->guard_manage('hrim_run_notifications_now'); $this->run_notification_triggers(); $this->back('hotel-inspection-communications','saved','Notification trigger evaluation completed.'); }
+    public function run_notifications_now(){
+        $this->guard_manage('hrim_run_notifications_now');
+        $this->run_notification_triggers(true);
+        $this->back('hotel-inspection-communications','saved','Test reminders run completed. Active reminder rules were evaluated immediately.');
+    }
 
     public function save_settings(){
         $this->guard_manage('hrim_save_settings');
+        global $wpdb;
+        $property_name=sanitize_text_field(wp_unslash($_POST['property_name']??''));
+        if($property_name==='') $this->dependency_error('hotel-inspection-settings','Property Name is required.');
+        $property=$wpdb->get_row("SELECT id FROM {$wpdb->prefix}hrim_hotels ORDER BY (status='active') DESC,id ASC LIMIT 1");
+        if($property){
+            $wpdb->update($wpdb->prefix.'hrim_hotels',['name'=>$property_name,'status'=>'active'],['id'=>(int)$property->id]);
+        }else{
+            $wpdb->insert($wpdb->prefix.'hrim_hotels',['name'=>$property_name,'status'=>'active']);
+        }
         update_option('hrim_accent',sanitize_hex_color($_POST['accent']??'')?:'#2563eb');
         update_option('hrim_show_room_score',isset($_POST['show_room_score'])?'1':'0');
-        update_option('hrim_show_floor_score',isset($_POST['show_floor_score'])?'1':'0');
+        if(!empty($_FILES['property_logo']['name'])){
+            $allowed=['image/jpeg','image/png','image/webp','image/gif'];
+            $file_type=wp_check_filetype_and_ext($_FILES['property_logo']['tmp_name'],$_FILES['property_logo']['name']);
+            if(empty($file_type['type']) || !in_array($file_type['type'],$allowed,true)){
+                $this->dependency_error('hotel-inspection-settings','Please upload a valid PNG, JPG, WEBP or GIF property logo.');
+            }
+            require_once ABSPATH.'wp-admin/includes/file.php';
+            require_once ABSPATH.'wp-admin/includes/media.php';
+            require_once ABSPATH.'wp-admin/includes/image.php';
+            $logo_id=media_handle_upload('property_logo',0);
+            if(is_wp_error($logo_id)) $this->dependency_error('hotel-inspection-settings',$logo_id->get_error_message());
+            update_option('hrim_property_logo_id',absint($logo_id));
+        }
         $this->back('hotel-inspection-settings','saved','Settings updated successfully.');
     }
     public function regenerate_pages(){ $this->guard_manage('hrim_regenerate_pages');HRIM_Activator::create_pages();$this->back('hotel-inspection-settings'); }
@@ -3803,6 +5112,9 @@ Assets:
 
     public function install_checklist_library(){
         $this->guard_manage('hrim_install_checklist_library');
+        if(get_option('hrim_checklist_library_version','')==='2.1'){
+            $this->back('hotel-inspection-settings','saved','Checklist library is already installed.');
+        }
         // Minimal safety repair: ensure the section/question tables exist before importing.
         HRIM_Activator::create_tables();
         global $wpdb;
@@ -3848,6 +5160,37 @@ Assets:
             'Staff Areas'=>['Staff entrance and attendance area are orderly','Changing rooms and lockers are clean','Staff toilets and wash areas are hygienic','Canteen is clean and food is safely handled','Notice boards contain current information','Uniform storage is organised','Staff rest area is clean','Drinking water is available','Emergency exits are clear','Personal belongings are secured'],
             'Terrace & Rooftop'=>['Terrace floor is clean and free from standing water','Parapet and railings are secure','Roof drains and rainwater outlets are clear','Water tanks and equipment are secured','Solar panels or rooftop equipment are clean','Access doors are locked when not in use','Lightning protection appears intact','No loose material can fall from the roof','Rooftop lighting is functional','Fire and emergency access is maintained']
         ];
+        // Hotel Rajmahal room checklist library. Installing creates each Section
+        // and then creates the listed checkpoints directly under that Section.
+        $library=[
+            'Bathroom Amenities'=>[
+                'Bucket','Dustbin','Mug','Shower Cap','Soap Dish','Toilet Roll','Tumbler Glass','WC Band'
+            ],
+            'Door / Window'=>[
+                'Emergency Exit Plan','Lock Function','Safety Latch','Toilet Lock Working','Window Cleaning'
+            ],
+            'Electrical'=>[
+                'AC Operation','Electronic Safe','Entrance Light','Entrance Light Switch','Hair Dryer','Light Switch','Refrigerator Operation','Telephone Working','TV Channel Set or Not','TV Remote Working'
+            ],
+            'Extra Cleaning'=>[
+                'Bathroom Wall Tiles','Heavy Curtain Clean','Sofa Cleaning','Telephone Disinfected','Under Bed Clean'
+            ],
+            'Furniture'=>[
+                'Chair','Luggage Rack','Writing Table'
+            ],
+            'Linen'=>[
+                'Duvet','Pillow','Sheer Curtain Clean'
+            ],
+            'Regular'=>[
+                'Bathroom Floor','Bed Properly Made','Bedside Lamp','Bedside Table Cleaning','Dispenser Filled or Not','Flush Shower Head','Lamp Dusted','Mirrors','Picture & Frame Dusted','Table Clean','Tap','WC Cleaning','Window Operation'
+            ],
+            'Room Amenities'=>[
+                'Amenity Folder','Coffee Kettle','Coffee / Sugar Free','Cup 2','Laundry Bag','Pad / Pencil','RO Water','Room Glass','Room Service Menu','Shoe Shine','Slipper','Spoon','Sugar / Tea'
+            ],
+            'Wardrobe'=>[
+                'Closet Light','Cloth Hanger (4 Pieces)','Wardrobe Door','Wardrobe Space'
+            ],
+        ];
         $sections_created=0; $sections_updated=0; $points_created=0; $points_existing=0; $sort=10;
         foreach($library as $section_name=>$questions){
             $section_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) LIMIT 1",$section_name));
@@ -3857,6 +5200,25 @@ Assets:
                 $section_id=(int)$wpdb->insert_id; $sections_created++;
             } else {
                 $wpdb->update($wpdb->prefix.'hrim_sections',['status'=>'active'],['id'=>$section_id]); $sections_updated++;
+            }
+            // Synchronize the active master list. Old default checkpoints that are
+            // not present in the supplied list must not remain visible or inflate
+            // the Sectionwise count.
+            $wanted=array_map(function($value){return strtolower(trim((string)$value));},$questions);
+            $current_points=$wpdb->get_results($wpdb->prepare("SELECT id,question FROM {$wpdb->prefix}hrim_questions WHERE section_id=%d AND is_library=1",$section_id));
+            foreach($current_points as $current_point){
+                if(in_array(strtolower(trim((string)$current_point->question)),$wanted,true))continue;
+                $qid=(int)$current_point->id;
+                $used=(int)$wpdb->get_var($wpdb->prepare("SELECT (SELECT COUNT(*) FROM {$wpdb->prefix}hrim_answers WHERE question_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_issues WHERE question_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_answers WHERE question_id=%d)+(SELECT COUNT(*) FROM {$wpdb->prefix}hrim_periodic_task_update_log WHERE question_id=%d)",$qid,$qid,$qid,$qid));
+                $wpdb->delete($wpdb->prefix.'hrim_room_question_exclusions',['question_id'=>$qid]);
+                $wpdb->delete($wpdb->prefix.'hrim_room_question_removals',['question_id'=>$qid]);
+                $wpdb->delete($wpdb->prefix.'hrim_room_question_additions',['question_id'=>$qid]);
+                $wpdb->delete($wpdb->prefix.'hrim_periodic_task_question_exclusions',['question_id'=>$qid]);
+                if($used){
+                    $wpdb->update($wpdb->prefix.'hrim_questions',['is_library'=>0,'section_id'=>null,'template_id'=>0,'section_name'=>$section_name],['id'=>$qid]);
+                }else{
+                    $wpdb->delete($wpdb->prefix.'hrim_questions',['id'=>$qid]);
+                }
             }
             $point_order=10;
             foreach($questions as $question){
@@ -3868,18 +5230,45 @@ Assets:
             }
             $sort+=10;
         }
-        update_option('hrim_checklist_library_version','1.0');
+        update_option('hrim_checklist_library_version','2.1');
         $this->audit('Checklist Library','install',0,['sections_created'=>$sections_created,'sections_existing'=>$sections_updated,'points_created'=>$points_created,'points_existing'=>$points_existing]);
         $this->back('hotel-inspection-settings','saved',sprintf('Detailed hotel checklist library installed: %d sections created, %d existing sections retained, %d checkpoints created and %d existing checkpoints retained. You can edit, deactivate or delete unused items from Checklist Sections.', $sections_created,$sections_updated,$points_created,$points_existing));
     }
 
+    public function delete_all_sections_checkpoints(){
+        $this->guard_manage('hrim_delete_all_sections_checkpoints'); global $wpdb;
+        $p=$wpdb->prefix;
+        $section_count=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}hrim_sections");
+        $checkpoint_count=(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}hrim_questions");
+        $wpdb->query('START TRANSACTION');
+
+        // Clear all current configuration and applicability relationships.
+        foreach(['hrim_room_sections','hrim_room_question_exclusions','hrim_room_question_removals','hrim_periodic_task_sections','hrim_periodic_task_question_exclusions','hrim_template_sections','hrim_room_templates','hrim_room_template_exclusions','hrim_category_templates'] as $table){
+            if($wpdb->query("DELETE FROM {$p}{$table}")===false){$wpdb->query('ROLLBACK');wp_die(esc_html($wpdb->last_error?:'Section setup could not be cleared.'));}
+        }
+
+        // Asset-specific additions that have never been used can be removed fully.
+        // Used question rows are retained invisibly so historical answers/issues keep
+        // their original checkpoint text, while the current master becomes empty.
+        $unused_ids=$wpdb->get_col("SELECT q.id FROM {$p}hrim_questions q WHERE NOT EXISTS (SELECT 1 FROM {$p}hrim_answers a WHERE a.question_id=q.id) AND NOT EXISTS (SELECT 1 FROM {$p}hrim_issues i WHERE i.question_id=q.id) AND NOT EXISTS (SELECT 1 FROM {$p}hrim_periodic_task_answers pa WHERE pa.question_id=q.id) AND NOT EXISTS (SELECT 1 FROM {$p}hrim_periodic_task_update_log pl WHERE pl.question_id=q.id)");
+        if($unused_ids){
+            $ids=implode(',',array_map('intval',$unused_ids));
+            $wpdb->query("DELETE FROM {$p}hrim_room_question_additions WHERE question_id IN ({$ids})");
+            $wpdb->query("DELETE FROM {$p}hrim_questions WHERE id IN ({$ids})");
+        }
+        $wpdb->query("UPDATE {$p}hrim_questions SET is_library=0,section_id=NULL,template_id=0 WHERE id IN (SELECT question_id FROM {$p}hrim_answers) OR id IN (SELECT question_id FROM {$p}hrim_issues WHERE question_id IS NOT NULL) OR id IN (SELECT question_id FROM {$p}hrim_periodic_task_answers) OR id IN (SELECT question_id FROM {$p}hrim_periodic_task_update_log WHERE question_id IS NOT NULL)");
+        $wpdb->query("DELETE FROM {$p}hrim_room_question_additions");
+        $wpdb->query("DELETE FROM {$p}hrim_sections");
+        $wpdb->query("DELETE FROM {$p}hrim_templates");
+        $wpdb->query('COMMIT');
+
+        delete_option('hrim_checklist_library_version');
+        $this->audit('Application','delete all sections and checkpoints',0,['sections'=>$section_count,'checkpoints'=>$checkpoint_count]);
+        $this->back('hotel-inspection-settings','saved',sprintf('%d Sections and %d Checklist Points were cleared successfully. Existing inspections and issues were retained.',$section_count,$checkpoint_count));
+    }
+
     public function install_dummy_data(){
         $this->guard_manage('hrim_install_dummy_data'); global $wpdb;
-        $template_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_templates WHERE name=%s LIMIT 1",'Standard Room Inspection'));
-        if(!$template_id){
-            $wpdb->insert($wpdb->prefix.'hrim_templates',['name'=>'Standard Room Inspection','description'=>'Dummy room inspection template for housekeeping and room quality checks.','status'=>'active']);
-            $template_id=(int)$wpdb->insert_id;
-        }
         $questions=[
             ['Room Readiness','Room entrance and door are clean and functioning properly'],['Room Readiness','Floor, walls and ceiling are clean and free from damage'],['Bed & Linen','Bed linen is clean, fresh and properly arranged'],['Bed & Linen','Pillows, cushions and mattress are in good condition'],['Bathroom','Bathroom, washbasin and toilet are clean and sanitised'],['Bathroom','Towels and toiletries are available as per standard'],['Amenities','Lighting, television, telephone and electrical points are working'],['Amenities','Air conditioning is working and set appropriately'],['Safety','Smoke detector, locks and safety equipment are in order'],['Final Check','Room is free from odour and ready for guest occupancy']
         ];
@@ -3889,7 +5278,6 @@ Assets:
             $sid=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_sections WHERE LOWER(TRIM(name))=LOWER(TRIM(%s)) LIMIT 1",$q[0]));
             if(!$sid){ $wpdb->insert($wpdb->prefix.'hrim_sections',['name'=>$q[0],'description'=>'Standard inspection section','sort_order'=>count($section_ids)+1,'status'=>'active']); $sid=(int)$wpdb->insert_id; }
             $section_ids[$q[0]]=$sid;
-            $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_template_sections (template_id,section_id,sort_order) VALUES (%d,%d,%d)",$template_id,$sid,count($section_ids)));
         }
         foreach($questions as $i=>$q){
             $sid=$section_ids[$q[0]]??0;
@@ -3898,7 +5286,6 @@ Assets:
         }
         $category_id=(int)$wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_room_categories WHERE name=%s LIMIT 1",'Standard Room'));
         if(!$category_id){ $wpdb->insert($wpdb->prefix.'hrim_room_categories',['name'=>'Standard Room','description'=>'Standard guest room category','status'=>'active']); $category_id=(int)$wpdb->insert_id; }
-        $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_category_templates (category_id,template_id) VALUES (%d,%d)",$category_id,$template_id));
         $floors=$wpdb->get_results("SELECT f.*,h.name hotel_name FROM {$wpdb->prefix}hrim_floors f INNER JOIN {$wpdb->prefix}hrim_hotels h ON h.id=f.hotel_id WHERE LOWER(TRIM(COALESCE(f.status,'active')))='active' AND LOWER(TRIM(COALESCE(h.status,'active')))='active' ORDER BY f.hotel_id,f.sort_order,f.id");
         if(!$floors){
             $floors=$wpdb->get_results("SELECT f.*,h.name hotel_name FROM {$wpdb->prefix}hrim_floors f INNER JOIN {$wpdb->prefix}hrim_hotels h ON h.id=f.hotel_id ORDER BY f.hotel_id,f.sort_order,f.id");
@@ -3909,12 +5296,15 @@ Assets:
             for($i=1;$i<=10;$i++){
                 $room_no=$prefix.str_pad((string)$i,2,'0',STR_PAD_LEFT);
                 $room=$wpdb->get_row($wpdb->prepare("SELECT id,category_id,floor_id FROM {$wpdb->prefix}hrim_rooms WHERE hotel_id=%d AND room_no=%s LIMIT 1",$f->hotel_id,$room_no));
-                if($room){ $update=[]; if(empty($room->category_id)){ $update['category_id']=$category_id; $update['category']='Standard Room'; $assigned++; } if((int)$room->floor_id !== (int)$f->id){ $update['floor_id']=$f->id; $relinked++; } if($update)$wpdb->update($wpdb->prefix.'hrim_rooms',$update,['id'=>$room->id]); continue; }
+                if($room){ $update=[]; if(empty($room->category_id)){ $update['category_id']=$category_id; $update['category']='Standard Room'; $assigned++; } if((int)$room->floor_id !== (int)$f->id){ $update['floor_id']=$f->id; $relinked++; } if($update)$wpdb->update($wpdb->prefix.'hrim_rooms',$update,['id'=>$room->id]); $room_id=(int)$room->id; }
+                else {
                 $ok=$wpdb->insert($wpdb->prefix.'hrim_rooms',['hotel_id'=>$f->hotel_id,'floor_id'=>$f->id,'category_id'=>$category_id,'room_no'=>$room_no,'category'=>'Standard Room','status'=>'active']);
-                if($ok)$created++;
+                if($ok){$created++;$room_id=(int)$wpdb->insert_id;}else continue;
+                }
+                foreach(array_values($section_ids) as $order=>$sid)$wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->prefix}hrim_room_sections (room_id,section_id,sort_order) VALUES (%d,%d,%d)",$room_id,$sid,$order+1));
             }
         }
-        $this->back('hotel-inspection-settings','saved',sprintf('Dummy setup completed for %d floors: template ready, %d rooms created, %d existing rooms assigned and %d rooms relinked.',count($floors),$created,$assigned,$relinked));
+        $this->back('hotel-inspection-settings','saved',sprintf('Dummy setup completed for %d floors: sections assigned directly, %d rooms created, %d existing rooms assigned and %d rooms relinked.',count($floors),$created,$assigned,$relinked));
     }
     private function dummy_room_prefix($floor_name,$sort_order,$floor_id){
         if(preg_match('/(\d+)/',(string)$floor_name,$m)) return (string)(int)$m[1];
@@ -3945,7 +5335,7 @@ Assets:
 
     public function ajax_get_rooms(){
         check_ajax_referer('hrim_ajax','nonce'); if(!is_user_logged_in())wp_send_json_error(); global $wpdb;
-        $rows=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.room_no,f.name floor_name,GROUP_CONCAT(DISTINCT x.template_id ORDER BY x.template_id) template_ids FROM {$wpdb->prefix}hrim_rooms r LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=r.floor_id LEFT JOIN (SELECT room_id,template_id FROM {$wpdb->prefix}hrim_room_templates UNION SELECT rr.id room_id,ct.template_id FROM {$wpdb->prefix}hrim_rooms rr INNER JOIN {$wpdb->prefix}hrim_category_templates ct ON ct.category_id=rr.category_id WHERE NOT EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions ex WHERE ex.room_id=rr.id AND ex.template_id=ct.template_id)) x ON x.room_id=r.id WHERE r.hotel_id=%d AND r.status='active' GROUP BY r.id ORDER BY f.sort_order,r.room_no",absint($_POST['hotel_id'])));
+        $rows=$wpdb->get_results($wpdb->prepare("SELECT r.id,r.room_no,f.name floor_name,CASE WHEN at.name IS NULL OR TRIM(at.name)='' OR LOWER(TRIM(at.name)) IN ('asset','assets','room','rooms') THEN 'Room' ELSE at.name END asset_type_name,GROUP_CONCAT(DISTINCT rs.section_id ORDER BY rs.sort_order) section_ids FROM {$wpdb->prefix}hrim_rooms r LEFT JOIN {$wpdb->prefix}hrim_floors f ON f.id=r.floor_id LEFT JOIN {$wpdb->prefix}hrim_asset_types at ON at.id=r.asset_type_id LEFT JOIN {$wpdb->prefix}hrim_room_sections rs ON rs.room_id=r.id WHERE r.hotel_id=%d AND r.status='active' GROUP BY r.id ORDER BY f.sort_order,r.room_no",absint($_POST['hotel_id'])));
         wp_send_json_success($rows);
     }
     public function ajax_get_room_checklist(){
@@ -3953,17 +5343,13 @@ Assets:
         if(!is_user_logged_in())wp_send_json_error('Please log in again.');
         global $wpdb;
         $room_id=absint($_POST['room_id']??0);
-        $room=$wpdb->get_row($wpdb->prepare("SELECT id,category_id FROM {$wpdb->prefix}hrim_rooms WHERE id=%d AND status='active'",$room_id));
+        $room=$wpdb->get_row($wpdb->prepare("SELECT id FROM {$wpdb->prefix}hrim_rooms WHERE id=%d AND status='active'",$room_id));
         if(!$room)wp_send_json_error('Invalid room.');
-        $template_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT DISTINCT template_id FROM (SELECT template_id FROM {$wpdb->prefix}hrim_room_templates WHERE room_id=%d UNION SELECT ct.template_id FROM {$wpdb->prefix}hrim_category_templates ct WHERE ct.category_id=%d AND NOT EXISTS (SELECT 1 FROM {$wpdb->prefix}hrim_room_template_exclusions x WHERE x.room_id=%d AND x.template_id=ct.template_id)) permitted ORDER BY template_id",$room_id,(int)$room->category_id,$room_id)));
-        if(!$template_ids)wp_send_json_success([]);
-        $ph=implode(',',array_fill(0,count($template_ids),'%d'));
-        $templates=$wpdb->get_results($wpdb->prepare("SELECT id,name,description FROM {$wpdb->prefix}hrim_templates WHERE status='active' AND id IN ($ph) ORDER BY name",$template_ids));
-        $out=[];
-        foreach($templates as $t){
-            $questions=$wpdb->get_results($wpdb->prepare("SELECT DISTINCT q.id,%d template_id,q.section_id,s.name section_name,q.question,q.question_type,q.required_flag,q.sort_order FROM {$wpdb->prefix}hrim_template_sections ts INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=ts.section_id AND s.status='active' INNER JOIN {$wpdb->prefix}hrim_questions q ON q.section_id=s.id AND q.is_library=1 LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id WHERE ts.template_id=%d AND rx.question_id IS NULL UNION ALL SELECT q.id,%d template_id,q.section_id,s.name section_name,q.question,q.question_type,q.required_flag,q.sort_order FROM {$wpdb->prefix}hrim_room_question_additions a INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE a.room_id=%d AND a.template_id=%d ORDER BY section_name,sort_order,id",$t->id,$room_id,$t->id,$t->id,$room_id,$t->id));
-            $out[]=['id'=>(int)$t->id,'name'=>$t->name,'description'=>$t->description,'questions'=>$questions];
-        }
+        $section_ids=array_map('intval',$wpdb->get_col($wpdb->prepare("SELECT section_id FROM {$wpdb->prefix}hrim_room_sections WHERE room_id=%d ORDER BY sort_order,section_id",$room_id)));
+        if(!$section_ids)wp_send_json_success([]);
+        $ph=implode(',',array_fill(0,count($section_ids),'%d'));
+        $questions=$wpdb->get_results($wpdb->prepare("SELECT q.id,0 template_id,q.section_id,s.name section_name,q.question,q.question_type,q.required_flag,q.sort_order FROM {$wpdb->prefix}hrim_questions q INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id AND s.status='active' LEFT JOIN {$wpdb->prefix}hrim_room_question_exclusions rx ON rx.room_id=%d AND rx.question_id=q.id LEFT JOIN {$wpdb->prefix}hrim_room_question_removals rr ON rr.room_id=%d AND rr.question_id=q.id WHERE q.is_library=1 AND q.section_id IN ($ph) AND rx.question_id IS NULL AND rr.question_id IS NULL UNION ALL SELECT q.id,0 template_id,q.section_id,s.name section_name,q.question,q.question_type,q.required_flag,q.sort_order FROM {$wpdb->prefix}hrim_room_question_additions a INNER JOIN {$wpdb->prefix}hrim_questions q ON q.id=a.question_id INNER JOIN {$wpdb->prefix}hrim_sections s ON s.id=q.section_id WHERE a.room_id=%d ORDER BY section_name,sort_order,id",array_merge([$room_id,$room_id],$section_ids,[$room_id])));
+        $out=[['id'=>0,'name'=>'Inspection Checklist','description'=>'','questions'=>$questions]];
         wp_send_json_success($out);
     }
 
@@ -3984,9 +5370,10 @@ Assets:
         $id=media_handle_upload('file',0);
         if(is_wp_error($id)) wp_send_json_error($id->get_error_message());
         update_post_meta($id,'_hrim_video_duration',min(60,$duration));
+        $this->mark_roomscore_video_attachment($id);
         wp_send_json_success(['id'=>$id,'url'=>wp_get_attachment_url($id),'duration'=>$duration]);
     }
-    public function ajax_upload_image(){ check_ajax_referer('hrim_ajax','nonce');if(!is_user_logged_in())wp_send_json_error();require_once ABSPATH.'wp-admin/includes/file.php';require_once ABSPATH.'wp-admin/includes/media.php';require_once ABSPATH.'wp-admin/includes/image.php';$id=media_handle_upload('file',0);if(is_wp_error($id))wp_send_json_error($id->get_error_message());wp_send_json_success(['id'=>$id,'url'=>wp_get_attachment_url($id)]); }
+    public function ajax_upload_image(){ check_ajax_referer('hrim_ajax','nonce');if(!is_user_logged_in())wp_send_json_error();require_once ABSPATH.'wp-admin/includes/file.php';require_once ABSPATH.'wp-admin/includes/media.php';require_once ABSPATH.'wp-admin/includes/image.php';$id=media_handle_upload('file',0);if(is_wp_error($id))wp_send_json_error($id->get_error_message());$id=$this->optimize_roomscore_image_attachment($id);wp_send_json_success(['id'=>$id,'url'=>wp_get_attachment_url($id)]); }
     public function clear_audit_log(){
         $this->guard_manage('hrim_clear_audit_log');
         global $wpdb;
